@@ -939,6 +939,7 @@ def list_models() -> ApiEnvelope:
         "anthropic": bool(app_settings.anthropic_api_key),
         "openai": bool(app_settings.openai_api_key),
         "deepseek": bool(app_settings.deepseek_api_key),
+        "dashscope": bool(app_settings.dashscope_api_key),
     }
 
     for m in models:
@@ -960,6 +961,7 @@ _PROVIDER_MAP = {
     "openai": "openai",
     "anthropic": "anthropic",
     "deepseek": "deepseek",
+    "dashscope": "dashscope",
 }
 
 # 推荐模型精选列表 — 只展示每个 provider 的主力 chat 模型
@@ -996,6 +998,13 @@ _RECOMMENDED_MODELS: Dict[str, list] = {
         "deepseek/deepseek-r1",
         "deepseek/deepseek-v3.2",
     ],
+    "dashscope": [
+        "qwen3.5-plus",
+        "qwen-plus",
+        "qwen-turbo",
+        "qwen-max",
+        "qwen-vl-max",
+    ],
 }
 
 
@@ -1018,6 +1027,11 @@ _DISPLAY_NAME_OVERRIDES: Dict[str, str] = {
     "deepseek/deepseek-reasoner": "DeepSeek Reasoner",
     "deepseek/deepseek-r1": "DeepSeek R1",
     "deepseek/deepseek-v3.2": "DeepSeek V3.2",
+    "qwen3.5-plus": "Qwen3.5 Plus",
+    "qwen-plus": "Qwen Plus",
+    "qwen-turbo": "Qwen Turbo",
+    "qwen-max": "Qwen Max",
+    "qwen-vl-max": "Qwen VL Max（视觉）",
 }
 
 
@@ -1044,12 +1058,14 @@ def _get_available_models(app_settings: Any) -> list:
         api_provider = _PROVIDER_MAP.get(provider, provider)
         for model_name in model_names:
             info = cost_map.get(model_name)
-            if not info:
-                continue
-            inp_per_1k = float(info.get("input_cost_per_token", 0)) * 1000
-            out_per_1k = float(info.get("output_cost_per_token", 0)) * 1000
+            if info:
+                inp_per_1k = float(info.get("input_cost_per_token", 0)) * 1000
+                out_per_1k = float(info.get("output_cost_per_token", 0)) * 1000
+            else:
+                # DashScope 等非 LiteLLM 原生模型，仍然展示（定价为 0）
+                inp_per_1k = 0.0
+                out_per_1k = 0.0
 
-            # 生成友好显示名
             display = _model_display_name(model_name)
 
             results.append({

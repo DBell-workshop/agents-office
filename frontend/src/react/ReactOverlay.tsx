@@ -1,5 +1,6 @@
 import React, { Component, useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
+import { getAgentsCached, loadAgentRegistry } from '../shared/agentRegistry';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { AgentStatusBar } from './AgentStatusBar';
 import { ChatBox } from './ChatBox';
@@ -61,25 +62,31 @@ interface AgentClickData {
   agentColor: string;
 }
 
+const MAX_AGENTS = 20;
+
 export const ReactOverlay: React.FC = () => {
   const [sceneReady, setSceneReady] = useState(false);
   const [configAgent, setConfigAgent] = useState<AgentClickData | null>(null);
   const [showDatabase, setShowDatabase] = useState(false);
+  const [agentCount, setAgentCount] = useState(6);
+
+  // 初始化 agent 计数
+  useEffect(() => {
+    setAgentCount(getAgentsCached().length);
+    loadAgentRegistry().then((entries) => {
+      setAgentCount(entries.length);
+    });
+  }, []);
 
   useEffect(() => {
     const onSceneReady = () => setSceneReady(true);
 
-    // Phaser 精灵点击 → 所有 Agent 都打开配置面板
+    // Phaser 精灵点击 → 打开配置面板（动态查找 agent）
     const onAgentClicked = (data: { agentId: string; name: string }) => {
-      const mapping: Record<string, { slug: string; color: string }> = {
-        agt_dispatcher: { slug: 'dispatcher', color: '#ff6b6b' },
-        agt_guide: { slug: 'shopping_guide', color: '#4ade80' },
-        agt_inventory: { slug: 'product_specialist', color: '#60a5fa' },
-        agt_data_eng: { slug: 'data_engineer', color: '#a78bfa' },
-      };
-      const info = mapping[data.agentId];
-      if (info) {
-        setConfigAgent({ agentSlug: info.slug, agentName: data.name, agentColor: info.color });
+      const agents = getAgentsCached();
+      const agent = agents.find((a) => a.phaserAgentId === data.agentId);
+      if (agent) {
+        setConfigAgent({ agentSlug: agent.slug, agentName: agent.displayName, agentColor: agent.color });
       }
     };
 
@@ -133,8 +140,37 @@ export const ReactOverlay: React.FC = () => {
           fontSize: '12px',
           color: '#4ade80',
           imageRendering: 'pixelated',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
         }}>
-          AgentsOffice v0.1 | Agents: 6
+          <span>AgentsOffice v0.1</span>
+          <span style={{ color: '#88cc99' }}>|</span>
+          <span>Agents: {agentCount}/{MAX_AGENTS}</span>
+          {agentCount < MAX_AGENTS && (
+            <button
+              onClick={() => EventBus.emit('agent:add-new', {})}
+              title="添加新 Agent"
+              style={{
+                background: '#4ade80',
+                color: '#000',
+                border: 'none',
+                borderRadius: 3,
+                width: 20,
+                height: 20,
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                lineHeight: 1,
+              }}
+            >
+              +
+            </button>
+          )}
         </div>
       )}
 

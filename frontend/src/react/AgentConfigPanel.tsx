@@ -184,6 +184,7 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
     openai: 'OpenAI',
     anthropic: 'Anthropic',
     deepseek: 'DeepSeek',
+    dashscope: '阿里云百炼 (DashScope)',
   };
 
   const displayColor = config.color || agentColor;

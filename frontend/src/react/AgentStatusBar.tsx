@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
 import { loadAgentRegistry, getAgentsCached } from '../shared/agentRegistry';
 
@@ -32,19 +32,17 @@ interface AgentDef {
 
 type AgentStatus = 'idle' | 'working' | 'standby';
 
+const MAX_PER_ROW = 7;
+
 function formatTokens(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return `${n}`;
 }
 
-function formatTime(seconds: number): string {
-  if (seconds < 60) return `${Math.floor(seconds)} 秒`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return s > 0 ? `${m} 分 ${s} 秒` : `${m} 分`;
-}
-
 export const AgentStatusBar: React.FC = () => {
+  // 展开/折叠状态
+  const [expanded, setExpanded] = useState(false);
+
   // ChatBox 宽度同步 — 信息卡不被聊天面板遮挡
   const [chatBoxWidth, setChatBoxWidth] = useState(520);
 
@@ -80,7 +78,6 @@ export const AgentStatusBar: React.FC = () => {
           active: true,
           hasPrompt: true,
         }));
-        // 保持已有 agent 的 modelDisplay 等运行时状态
         return fromRegistry.map((r) => {
           const existing = prev.find((p) => p.slug === r.slug);
           return existing ? { ...r, modelDisplay: existing.modelDisplay, active: existing.active, hasPrompt: existing.hasPrompt } : r;
@@ -98,8 +95,6 @@ export const AgentStatusBar: React.FC = () => {
   });
 
   const [tokens, setTokens] = useState<Record<string, number>>({});
-  const [workSeconds, setWorkSeconds] = useState<Record<string, number>>({});
-  const workStartRef = useRef<Record<string, number>>({});
 
   // 从后端加载 agent 定义
   const syncAgentDefinitions = useCallback(() => {
@@ -124,7 +119,6 @@ export const AgentStatusBar: React.FC = () => {
             };
           });
 
-          // 更新 standby 状态
           setStatuses((prevStatuses) => {
             const newStatuses = { ...prevStatuses };
             for (const agent of updated) {
@@ -175,24 +169,7 @@ export const AgentStatusBar: React.FC = () => {
 
   useEffect(() => {
     const onStatusChange = (data: { agentSlug: string; status: AgentStatus }) => {
-      setStatuses((prev) => {
-        const oldStatus = prev[data.agentSlug];
-        if (data.status === 'working' && oldStatus !== 'working') {
-          workStartRef.current[data.agentSlug] = Date.now();
-        }
-        if (oldStatus === 'working' && data.status !== 'working') {
-          const start = workStartRef.current[data.agentSlug];
-          if (start) {
-            const elapsed = (Date.now() - start) / 1000;
-            setWorkSeconds((ws) => ({
-              ...ws,
-              [data.agentSlug]: (ws[data.agentSlug] || 0) + elapsed,
-            }));
-            delete workStartRef.current[data.agentSlug];
-          }
-        }
-        return { ...prev, [data.agentSlug]: data.status };
-      });
+      setStatuses((prev) => ({ ...prev, [data.agentSlug]: data.status }));
     };
 
     const onTokenUsage = (data: { agentSlug: string; tokens: number }) => {
@@ -226,91 +203,117 @@ export const AgentStatusBar: React.FC = () => {
     });
   };
 
+  // 将 agents 按每行 MAX_PER_ROW 分组
+  const rows: AgentDef[][] = [];
+  for (let i = 0; i < agents.length; i += MAX_PER_ROW) {
+    rows.push(agents.slice(i, i + MAX_PER_ROW));
+  }
+
   return (
     <div style={{ ...styles.bar, right: chatBoxWidth + 16 }}>
-      {agents.map((agent) => {
-        const status = statuses[agent.slug] || 'standby';
-        const isWorking = status === 'working';
-        const totalTokens = tokens[agent.slug] || 0;
-        const totalWork = workSeconds[agent.slug] || 0;
+      {/* 展开/折叠按钮 */}
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={styles.toggleBtn}
+        title={expanded ? '收起详情' : '展开详情'}
+      >
+        <span style={{ fontSize: 10 }}>{expanded ? '▼' : '▲'}</span>
+        <span style={{ fontSize: 11 }}>
+          {expanded ? '收起' : '详情'}
+        </span>
+      </div>
 
-        return (
-          <div
-            key={agent.slug}
-            onClick={() => handleCardClick(agent)}
-            style={{
-              ...styles.card,
-              opacity: agent.active ? 1 : 0.7,
-              borderColor: isWorking ? agent.color : (agent.active ? '#887755' : '#776655'),
-              boxShadow: isWorking ? `0 0 10px ${agent.color}44` : 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {/* 状态圆点 */}
-            <div style={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              background: isWorking ? agent.color : (agent.active ? '#887755' : '#776655'),
-              boxShadow: isWorking ? `0 0 10px ${agent.color}, 0 0 4px ${agent.color}` : 'none',
-              border: `2px solid ${agent.color}`,
-              flexShrink: 0,
-            }} />
+      {/* Agent 卡片网格 */}
+      {rows.map((row, rowIdx) => (
+        <div key={rowIdx} style={styles.row}>
+          {row.map((agent) => {
+            const status = statuses[agent.slug] || 'standby';
+            const isWorking = status === 'working';
+            const totalTokens = tokens[agent.slug] || 0;
 
-            {/* 信息区 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: agent.color, fontWeight: 'bold', fontSize: '16px' }}>
-                  {agent.name}
-                </span>
-                <span style={{
-                  color: isWorking ? '#66ff88' : '#ddcc99',
-                  fontSize: '13px',
-                  fontWeight: isWorking ? 'bold' : 'normal',
-                }}>
-                  {statusLabel(status)}
-                </span>
-              </div>
-
-              <div style={{ color: '#ccbb88', fontSize: '12px', marginTop: 3 }}>
-                {agent.role}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <span style={{ fontSize: '12px', color: agent.active ? '#55dd77' : '#aa8855' }}>
-                  {agent.active ? '\u25cf' : '\u25cb'}
-                </span>
-                <span style={{ color: agent.active ? '#ddcc88' : '#aa9977', fontSize: '12px' }}>
-                  {agent.active ? `${agent.modelDisplay} 已连接` : agent.modelDisplay}
-                </span>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: 14,
-                marginTop: 4,
-                paddingTop: 4,
-                borderTop: '1px solid #55442233',
-              }}>
-                {agent.active ? (
-                  <>
-                    <span style={{ color: '#ccaa66', fontSize: '12px' }}>
-                      消耗 {formatTokens(totalTokens)} tokens
-                    </span>
-                    <span style={{ color: '#ccaa66', fontSize: '12px' }}>
-                      工时 {formatTime(totalWork)}
-                    </span>
-                  </>
-                ) : (
-                  <span style={{ color: '#887766', fontSize: '12px' }}>
-                    点击配置并激活
+            return (
+              <div
+                key={agent.slug}
+                onClick={() => handleCardClick(agent)}
+                style={{
+                  ...styles.card,
+                  opacity: agent.active ? 1 : 0.7,
+                  borderColor: isWorking ? agent.color : (agent.active ? '#887755' : '#776655'),
+                  boxShadow: isWorking ? `0 0 10px ${agent.color}44` : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {/* 紧凑头部：圆点 + 名称 + 状态 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: isWorking ? agent.color : (agent.active ? '#887755' : '#776655'),
+                    boxShadow: isWorking ? `0 0 6px ${agent.color}` : 'none',
+                    border: `1.5px solid ${agent.color}`,
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ color: agent.color, fontWeight: 'bold', fontSize: '13px' }}>
+                    {agent.name}
                   </span>
+                  <span style={{
+                    color: isWorking ? '#66ff88' : '#ddcc99',
+                    fontSize: '11px',
+                    fontWeight: isWorking ? 'bold' : 'normal',
+                    marginLeft: 'auto',
+                  }}>
+                    {statusLabel(status)}
+                  </span>
+                </div>
+
+                {/* 展开时显示的详细信息 */}
+                {expanded && (
+                  <>
+                    <div style={{ color: '#ccbb88', fontSize: '11px', marginTop: 3, lineHeight: 1.3 }}>
+                      {agent.role}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                      <span style={{ fontSize: '10px', color: agent.active ? '#55dd77' : '#aa8855' }}>
+                        {agent.active ? '\u25cf' : '\u25cb'}
+                      </span>
+                      <span style={{ color: agent.active ? '#ddcc88' : '#aa9977', fontSize: '11px' }}>
+                        {agent.active ? `${agent.modelDisplay}` : '未配置'}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      marginTop: 3,
+                      paddingTop: 3,
+                      borderTop: '1px solid #55442233',
+                    }}>
+                      {agent.active ? (
+                        <span style={{ color: '#ccaa66', fontSize: '11px' }}>
+                          消耗 {formatTokens(totalTokens)} tokens
+                        </span>
+                      ) : (
+                        <span style={{ color: '#887766', fontSize: '11px' }}>
+                          点击配置
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* 折叠时只显示 token 摘要 */}
+                {!expanded && agent.active && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                    <span style={{ color: '#ccaa66', fontSize: '10px' }}>
+                      {formatTokens(totalTokens)} tok
+                    </span>
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
@@ -322,20 +325,38 @@ const styles: Record<string, React.CSSProperties> = {
     left: 12,
     right: 376,
     display: 'flex',
-    gap: 6,
+    flexDirection: 'column',
+    gap: 4,
     pointerEvents: 'auto',
     zIndex: 10,
+  },
+  toggleBtn: {
+    alignSelf: 'flex-end',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    background: 'rgba(20, 15, 8, 0.85)',
+    border: '1px solid #887755',
+    borderRadius: 3,
+    padding: '2px 8px',
+    fontFamily: 'monospace',
+    color: '#ccbb88',
+    cursor: 'pointer',
+    userSelect: 'none' as const,
+  },
+  row: {
+    display: 'flex',
+    gap: 4,
   },
   card: {
     flex: 1,
     minWidth: 0,
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: 10,
+    flexDirection: 'column' as const,
     background: 'rgba(20, 15, 8, 0.93)',
     border: '2px solid #887755',
     borderRadius: 5,
-    padding: '10px 12px',
+    padding: '6px 8px',
     fontFamily: 'monospace',
     boxSizing: 'border-box' as const,
   },
