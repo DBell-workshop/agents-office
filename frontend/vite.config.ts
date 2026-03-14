@@ -16,6 +16,7 @@ export default defineConfig({
       },
     },
   },
+  base: '/static/office/',
   build: {
     outDir: '../app/static/office',
     emptyOutDir: true,
