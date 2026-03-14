@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
-
-// 默认 Agent 定义（后端未加载前的 fallback）
-const DEFAULT_AGENTS = [
-  { slug: 'dispatcher', name: '调度员', color: '#ff6b6b', role: '任务调度', defaultModel: 'Gemini Flash', active: true },
-  { slug: 'shopping_guide', name: '导购员', color: '#4ade80', role: '商品推荐', defaultModel: 'Gemini Flash', active: true },
-  { slug: 'product_specialist', name: '理货员', color: '#60a5fa', role: '数据查询', defaultModel: 'Gemini Flash', active: true },
-  { slug: 'data_engineer', name: '数据工程师', color: '#a78bfa', role: '数据管理', defaultModel: 'Gemini Flash', active: true },
-  { slug: 'standby_1', name: '待命 1', color: '#fbbf24', role: '待分配', defaultModel: '未接入', active: false },
-  { slug: 'standby_2', name: '待命 2', color: '#f472b6', role: '待分配', defaultModel: '未接入', active: false },
-];
+import { loadAgentRegistry, getAgentsCached } from '../shared/agentRegistry';
 
 // 模型名称显示映射 — 从 /api/v1/office/models 动态加载
 let MODEL_DISPLAY_NAMES: Record<string, string> = {};
@@ -54,23 +45,55 @@ function formatTime(seconds: number): string {
 }
 
 export const AgentStatusBar: React.FC = () => {
-  // Agent 定义列表（从后端加载 + 合并默认）
+  // ChatBox 宽度同步 — 信息卡不被聊天面板遮挡
+  const [chatBoxWidth, setChatBoxWidth] = useState(360);
+
+  useEffect(() => {
+    const onResize = (data: { width: number }) => setChatBoxWidth(data.width);
+    EventBus.on('chatbox:resize', onResize);
+    return () => { EventBus.off('chatbox:resize', onResize); };
+  }, []);
+
+  // Agent 定义列表（从 agentRegistry 加载）
   const [agents, setAgents] = useState<AgentDef[]>(() =>
-    DEFAULT_AGENTS.map((a) => ({
+    getAgentsCached().map((a) => ({
       slug: a.slug,
-      name: a.name,
+      name: a.displayName,
       color: a.color,
       role: a.role,
-      modelDisplay: a.defaultModel,
-      active: a.active,
-      hasPrompt: a.active, // 内置 agent 默认有 prompt
+      modelDisplay: 'Gemini Flash',
+      active: true,
+      hasPrompt: true,
     }))
   );
 
+  // 加载注册表后更新 agent 列表
+  useEffect(() => {
+    loadAgentRegistry().then((entries) => {
+      setAgents((prev) => {
+        const slugSet = new Set(prev.map((a) => a.slug));
+        const fromRegistry = entries.map((a) => ({
+          slug: a.slug,
+          name: a.displayName,
+          color: a.color,
+          role: a.role,
+          modelDisplay: 'Gemini Flash',
+          active: true,
+          hasPrompt: true,
+        }));
+        // 保持已有 agent 的 modelDisplay 等运行时状态
+        return fromRegistry.map((r) => {
+          const existing = prev.find((p) => p.slug === r.slug);
+          return existing ? { ...r, modelDisplay: existing.modelDisplay, active: existing.active, hasPrompt: existing.hasPrompt } : r;
+        });
+      });
+    });
+  }, []);
+
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => {
     const init: Record<string, AgentStatus> = {};
-    for (const a of DEFAULT_AGENTS) {
-      init[a.slug] = a.active ? 'idle' : 'standby';
+    for (const a of getAgentsCached()) {
+      init[a.slug] = 'idle';
     }
     return init;
   });
@@ -91,7 +114,7 @@ export const AgentStatusBar: React.FC = () => {
             if (!cfg) return agent;
             return {
               ...agent,
-              name: cfg.display_name || agent.name,
+              name: (cfg.display_name && cfg.display_name !== agent.slug) ? cfg.display_name : agent.name,
               color: cfg.color || agent.color,
               role: cfg.role || agent.role,
               modelDisplay: cfg.model_name
@@ -205,7 +228,7 @@ export const AgentStatusBar: React.FC = () => {
   };
 
   return (
-    <div style={styles.bar}>
+    <div style={{ ...styles.bar, right: chatBoxWidth + 16 }}>
       {agents.map((agent) => {
         const status = statuses[agent.slug] || 'standby';
         const isWorking = status === 'working';

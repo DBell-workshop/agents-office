@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { EventBus } from '../../shared/events/EventBus';
+import { getAgentsCached, getSpriteKey } from '../../shared/agentRegistry';
 
 // LimeZu 32x64 frames: 56 cols x 20 rows
 // Row 1: idle loop (24 frames: down 0-5, right 6-11, up 12-17, left 18-23)
@@ -31,8 +32,12 @@ const ROOMS: Record<
     labelPos: { x: 330, y: 120 },
     entry: { x: 400, y: 365 },
     spots: [
-      { x: 272, y: 240 },
-      { x: 350, y: 200 },
+      { x: 265, y: 200 },
+      { x: 365, y: 200 },
+      { x: 465, y: 200 },
+      { x: 265, y: 280 },
+      { x: 365, y: 280 },
+      { x: 465, y: 280 },
     ],
   },
   // 调度中心（右上）— 调度员常驻，分配任务
@@ -41,8 +46,12 @@ const ROOMS: Record<
     labelPos: { x: 840, y: 100 },
     entry: { x: 688, y: 270 },
     spots: [
-      { x: 850, y: 160 },
-      { x: 950, y: 160 },
+      { x: 765, y: 160 },
+      { x: 865, y: 160 },
+      { x: 965, y: 160 },
+      { x: 765, y: 240 },
+      { x: 865, y: 240 },
+      { x: 965, y: 240 },
     ],
   },
   // 协作室（左下）— 多 Agent 协同讨论
@@ -51,9 +60,12 @@ const ROOMS: Record<
     labelPos: { x: 330, y: 540 },
     entry: { x: 400, y: 525 },
     spots: [
-      { x: 272, y: 650 },
-      { x: 350, y: 700 },
-      { x: 272, y: 750 },
+      { x: 265, y: 620 },
+      { x: 365, y: 620 },
+      { x: 465, y: 620 },
+      { x: 265, y: 720 },
+      { x: 365, y: 720 },
+      { x: 465, y: 720 },
     ],
   },
   // 待命区（右侧中部）— 待命 Agent 就绪等待
@@ -62,12 +74,12 @@ const ROOMS: Record<
     labelPos: { x: 840, y: 340 },
     entry: { x: 850, y: 430 },
     spots: [
-      { x: 800, y: 500 },
-      { x: 900, y: 500 },
-      { x: 1000, y: 500 },
-      { x: 800, y: 580 },
-      { x: 900, y: 580 },
-      { x: 1000, y: 580 },
+      { x: 825, y: 500 },
+      { x: 920, y: 500 },
+      { x: 1005, y: 500 },
+      { x: 825, y: 580 },
+      { x: 920, y: 580 },
+      { x: 1005, y: 580 },
     ],
   },
   // 数据仓库（右侧下部）— 理货员常驻，管理商品数据
@@ -76,9 +88,12 @@ const ROOMS: Record<
     labelPos: { x: 840, y: 650 },
     entry: { x: 848, y: 660 },
     spots: [
-      { x: 850, y: 800 },
-      { x: 950, y: 800 },
-      { x: 900, y: 750 },
+      { x: 810, y: 730 },
+      { x: 900, y: 730 },
+      { x: 985, y: 730 },
+      { x: 810, y: 830 },
+      { x: 900, y: 830 },
+      { x: 985, y: 830 },
     ],
   },
 };
@@ -133,16 +148,22 @@ const ROOM_CORRIDOR: Record<string, string> = {
 type Direction = 'down' | 'right' | 'up' | 'left';
 
 // ============================================================
-// 6 个 Agent 配置
+// Agent 配置 — 从 agentRegistry 动态构建
 // ============================================================
-const AGENT_SPAWNS = [
-  { agentId: 'agt_dispatcher', name: '调度员', slug: 'dispatcher', spriteKey: 'char_01', homeRoom: 'manager', color: 0xff6b6b },
-  { agentId: 'agt_guide', name: '导购员', slug: 'shopping_guide', spriteKey: 'char_02', homeRoom: 'showroom', color: 0x4ade80 },
-  { agentId: 'agt_inventory', name: '理货员', slug: 'product_specialist', spriteKey: 'char_03', homeRoom: 'datacenter', color: 0x60a5fa },
-  { agentId: 'agt_data_eng', name: '数据工程师', slug: 'data_engineer', spriteKey: 'char_04', homeRoom: 'datacenter', color: 0xa78bfa },
-  { agentId: 'agt_standby_1', name: '待命 1', slug: 'standby_1', spriteKey: 'char_05', homeRoom: 'workspace', color: 0xfbbf24 },
-  { agentId: 'agt_standby_2', name: '待命 2', slug: 'standby_2', spriteKey: 'char_06', homeRoom: 'workspace', color: 0xf472b6 },
-];
+function cssColorToHex(css: string): number {
+  return parseInt(css.replace('#', ''), 16);
+}
+
+function buildAgentSpawns() {
+  return getAgentsCached().map((a) => ({
+    agentId: a.phaserAgentId || `agt_${a.slug}`,
+    name: a.displayName,
+    slug: a.slug,
+    spriteKey: getSpriteKey(a.slug),
+    homeRoom: a.roomId || 'workspace',
+    color: cssColorToHex(a.color),
+  }));
+}
 
 interface AgentCharacter {
   container: Phaser.GameObjects.Container;
@@ -161,6 +182,7 @@ interface AgentCharacter {
 
 export class OfficeScene extends Phaser.Scene {
   private agents: AgentCharacter[] = [];
+  private agentSpawns: ReturnType<typeof buildAgentSpawns> = [];
   private map!: Phaser.Tilemaps.Tilemap;
   private corridorGraph: Map<string, string[]> = new Map();
 
@@ -169,6 +191,7 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   create() {
+    this.agentSpawns = buildAgentSpawns();
     this.buildCorridorGraph();
 
     // 1. 地图
@@ -450,7 +473,7 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   private createAnimations() {
-    AGENT_SPAWNS.forEach((spawn) => {
+    this.agentSpawns.forEach((spawn) => {
       const key = spawn.spriteKey;
       const dirs: { dir: Direction; colStart: number }[] = [
         { dir: 'down', colStart: 0 },
@@ -482,10 +505,15 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   private createAgents() {
-    AGENT_SPAWNS.forEach((spawn, index) => {
+    // 按房间追踪已分配的站位数量
+    const roomSpotCounter: Record<string, number> = {};
+
+    this.agentSpawns.forEach((spawn) => {
       const room = ROOMS[spawn.homeRoom];
-      const spotIndex = spawn.homeRoom === 'workspace' ? index - 3 : 0;
-      const pos = room.spots[spotIndex] || room.spots[0];
+      const usedCount = roomSpotCounter[spawn.homeRoom] || 0;
+      const spotIndex = usedCount % room.spots.length;
+      roomSpotCounter[spawn.homeRoom] = usedCount + 1;
+      const pos = room.spots[spotIndex];
 
       const sprite = this.add.sprite(0, 0, spawn.spriteKey);
       sprite.play(`${spawn.spriteKey}-idle-down`);

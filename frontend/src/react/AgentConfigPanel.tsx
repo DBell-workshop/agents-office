@@ -19,6 +19,8 @@ interface AgentConfig {
   model_name: string;
   temperature: number;
   max_tokens: number;
+  api_base: string;
+  api_key: string;
   // 身份定义
   display_name: string;
   role: string;
@@ -43,6 +45,8 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
     model_name: '',
     temperature: 0.7,
     max_tokens: 2048,
+    api_base: '',
+    api_key: '',
     display_name: agentName,
     role: '',
     system_prompt: '',
@@ -54,6 +58,18 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
   const [activeTab, setActiveTab] = useState<Tab>('identity');
   const [refining, setRefining] = useState(false);
   const [refineMsg, setRefineMsg] = useState('');
+  const [templates, setTemplates] = useState<Array<{slug: string; display_name: string; role: string; color: string; system_prompt: string}>>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // 加载预设模板
+  useEffect(() => {
+    fetch('/api/v1/office/agent-templates')
+      .then((r) => r.json())
+      .then((envelope) => {
+        setTemplates(envelope?.data?.templates || []);
+      })
+      .catch(() => {});
+  }, []);
 
   // 加载可用模型列表
   useEffect(() => {
@@ -80,6 +96,8 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
             model_name: agentCfg.model_name || '',
             temperature: agentCfg.temperature ?? 0.7,
             max_tokens: agentCfg.max_tokens ?? 2048,
+            api_base: agentCfg.api_base || '',
+            api_key: agentCfg.api_key || '',
             display_name: agentCfg.display_name || agentName,
             role: agentCfg.role || '',
             system_prompt: agentCfg.system_prompt || '',
@@ -216,6 +234,54 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
         {/* === 身份定义 Tab === */}
         {activeTab === 'identity' && (
           <>
+            {/* 从模板加载 */}
+            <div style={styles.section}>
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                style={{
+                  background: 'rgba(255, 215, 0, 0.1)', border: '1px dashed #665544',
+                  borderRadius: 4, padding: '6px 12px', color: '#ccbb88', cursor: 'pointer',
+                  fontSize: '12px', width: '100%',
+                }}
+              >
+                {showTemplates ? '▾ 收起模板' : '▸ 从预设模板加载...'}
+              </button>
+              {showTemplates && (
+                <div style={{
+                  marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+                }}>
+                  {templates.map((t) => (
+                    <button
+                      key={t.slug}
+                      onClick={() => {
+                        setConfig((c) => ({
+                          ...c,
+                          display_name: t.display_name,
+                          role: t.role,
+                          color: t.color,
+                          system_prompt: t.system_prompt,
+                        }));
+                        setShowTemplates(false);
+                        setMessage(`已加载「${t.display_name}」模板`);
+                        setTimeout(() => setMessage(''), 2000);
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)', border: '1px solid #44382a',
+                        borderRadius: 4, padding: '8px', cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ color: t.color, fontSize: '13px', fontWeight: 'bold' }}>
+                        {t.display_name}
+                      </div>
+                      <div style={{ color: '#998877', fontSize: '11px', marginTop: 2 }}>
+                        {t.role.length > 30 ? t.role.slice(0, 30) + '...' : t.role}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div style={styles.section}>
               <label style={styles.label}>Agent 名称</label>
               <input
@@ -277,6 +343,30 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
                 未激活的 Agent 不会出现在调度员的路由选项中
               </div>
             </div>
+
+            {/* 数据工程师专属：数据库管理入口 */}
+            {agentSlug === 'data_engineer' && (
+              <div style={{
+                marginTop: 8,
+                padding: '12px 14px',
+                background: 'rgba(167, 139, 250, 0.08)',
+                border: '1px solid rgba(167, 139, 250, 0.3)',
+                borderRadius: 6,
+              }}>
+                <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 'bold', marginBottom: 8 }}>
+                  数据工程师专属工具
+                </div>
+                <button
+                  onClick={() => EventBus.emit('database:open')}
+                  style={styles.dbBtn}
+                >
+                  🗄️ 打开数据库管理面板
+                </button>
+                <div style={{ ...styles.hint, marginTop: 6 }}>
+                  查看已导入的数据表、表结构、数据预览和上传的文件
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -410,6 +500,44 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
               <div style={styles.rangeLabels}>
                 <span>256</span><span>8192</span>
               </div>
+            </div>
+
+            {/* 自定义代理接入 */}
+            <div style={{ ...styles.section, borderTop: '1px solid #33281a', paddingTop: 12, marginTop: 8 }}>
+              <label style={styles.label}>自定义代理接入 (可选)</label>
+              <div style={styles.hint}>
+                支持 one-api / new-api 等 OpenAI 兼容代理服务。留空则使用系统全局 API Key。
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <label style={{ ...styles.label, fontSize: '12px' }}>代理地址 (Base URL)</label>
+                <input
+                  type="text"
+                  placeholder="例: https://your-proxy.com/v1"
+                  value={config.api_base}
+                  onChange={(e) => setConfig((c) => ({ ...c, api_base: e.target.value }))}
+                  style={styles.input}
+                />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <label style={{ ...styles.label, fontSize: '12px' }}>API Key (代理密钥)</label>
+                <input
+                  type="password"
+                  placeholder="sk-..."
+                  value={config.api_key}
+                  onChange={(e) => setConfig((c) => ({ ...c, api_key: e.target.value }))}
+                  style={styles.input}
+                />
+              </div>
+              {(config.api_base || config.api_key) && (
+                <div style={{
+                  marginTop: 8, padding: '6px 10px', borderRadius: 4,
+                  background: 'rgba(255, 170, 50, 0.1)', border: '1px solid rgba(255, 170, 50, 0.3)',
+                  fontSize: '11px', color: '#ccaa66', lineHeight: 1.5,
+                }}>
+                  注意：使用第三方代理服务时，请确保该服务可信。API Key 将以加密方式存储，但仍建议使用专用子密钥。
+                  部分代理服务可能不支持所有模型功能（如 Function Calling）。
+                </div>
+              )}
             </div>
           </>
         )}
@@ -579,5 +707,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     fontSize: '12px',
     fontWeight: 'bold',
+  },
+  dbBtn: {
+    background: 'rgba(167, 139, 250, 0.2)',
+    border: '1px solid #a78bfa',
+    borderRadius: 4,
+    color: '#a78bfa',
+    padding: '8px 16px',
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    width: '100%',
   },
 };
