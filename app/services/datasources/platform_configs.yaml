@@ -1,0 +1,51 @@
+# 电商平台采集配置
+# 每个平台定义搜索URL模板和基本行为参数
+# LLM 负责理解页面内容，这里不包含任何 DOM/CSS 选择器
+
+platforms:
+  京东:
+    enabled: true
+    search_url_template: "https://search.jd.com/Search?keyword={query}&enc=utf-8"
+    product_url_pattern: "https://item.jd.com/{product_id}.html"
+    # 页面加载后额外等待时间（秒），确保动态内容渲染完成
+    page_load_wait: 3
+    # 页面滚动次数，模拟人类浏览以加载懒加载内容
+    scroll_times: 2
+    # 采集提示：帮助 LLM 理解该平台页面的上下文（可选）
+    hints: "京东商品页面通常包含商品标题、价格、促销标签、店铺信息和用户评价数"
+
+  淘宝:
+    enabled: true
+    search_url_template: "https://s.taobao.com/search?q={query}"
+    product_url_pattern: "https://item.taobao.com/item.htm?id={product_id}"
+    page_load_wait: 4
+    scroll_times: 2
+    hints: "淘宝页面可能需要登录才能看到完整价格，注意识别「登录查看」等提示"
+
+  拼多多:
+    enabled: true
+    search_url_template: "https://mobile.yangkeduo.com/search_result.html?search_key={query}"
+    product_url_pattern: "https://mobile.yangkeduo.com/goods.html?goods_id={product_id}"
+    page_load_wait: 3
+    scroll_times: 1
+    hints: "拼多多以移动端为主，商品列表可能显示拼团价和单买价"
+
+# 全局采集行为配置
+browser:
+  # 无头模式（true=不显示浏览器窗口，false=显示窗口便于调试）
+  headless: true
+  # 浏览器视窗大小
+  viewport:
+    width: 1280
+    height: 800
+  # 请求间随机延迟范围（秒）
+  delay:
+    min: 2
+    max: 5
+  # 单次搜索最多提取商品数
+  max_products_per_platform: 5
+  # 单页超时时间（秒）
+  page_timeout: 30
+  # 截图模式：screenshot（发截图给多模态LLM）或 text（提取页面文本发给LLM）
+  # screenshot 更通用但消耗更多 token，text 更快更省但依赖页面文本质量
+  extraction_mode: text

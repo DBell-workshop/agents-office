@@ -28,7 +28,10 @@ class Settings:
     # ---------- 默认模型 ----------
     default_llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini/gemini-2.0-flash").strip()
 
-    # ---------- OpenClaw ----------
+    # ---------- 数据源 ----------
+    datasource_mode: str = os.getenv("DATASOURCE_MODE", "mock").strip().lower()
+
+    # ---------- OpenClaw（已弃用，保留向后兼容） ----------
     openclaw_mode: str = os.getenv("OPENCLAW_MODE", "mock").strip().lower()
     openclaw_remote_base_url: str = os.getenv("OPENCLAW_REMOTE_BASE_URL", "http://127.0.0.1:9001").strip()
     openclaw_timeout_seconds: float = float(os.getenv("OPENCLAW_TIMEOUT_SECONDS", "15"))
