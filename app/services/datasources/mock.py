@@ -266,8 +266,37 @@ _MOCK_CATALOG: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
 }
 
 
+def _build_url_index() -> Dict[str, Dict[str, Any]]:
+    """构建 URL → 商品 的索引，支持 fetch_product 快速查找。"""
+    index: Dict[str, Dict[str, Any]] = {}
+    for _cat, platform_products in _MOCK_CATALOG.items():
+        for products in platform_products.values():
+            for p in products:
+                if p.get("url"):
+                    index[p["url"]] = p
+    return index
+
+
+_URL_INDEX = _build_url_index()
+
+
 class MockDataSource(ProductDataSource):
     """Mock 数据源：基于关键词模糊匹配本地商品目录。"""
+
+    async def fetch_product(self, url: str) -> Optional[Dict[str, Any]]:
+        """通过 URL 查找 mock 商品（支持精确匹配和模糊匹配）。"""
+        await asyncio.sleep(0.1)
+
+        # 精确匹配
+        if url in _URL_INDEX:
+            return dict(_URL_INDEX[url])
+
+        # 模糊匹配：URL 包含 mock 商品 URL 的关键部分
+        for mock_url, product in _URL_INDEX.items():
+            if mock_url in url or url in mock_url:
+                return dict(product)
+
+        return None
 
     async def search(
         self,
