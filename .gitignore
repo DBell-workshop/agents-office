@@ -1,0 +1,31 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+data/
+uploads/
+*.log
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Build artifacts
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Test screenshots
+*.png
+output/
+
+# 密钥文件 — 绝对不能提交
+.env
+.env.local
+.env.*.local

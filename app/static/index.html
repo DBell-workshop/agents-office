@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ecommerce AI Lab Prototype</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Ecommerce AI Lab Prototype</h1>
+      <p>Phase-1 scenarios: sales training and cross-platform comparison.</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Sales Training</h2>
+        <div class="form-grid">
+          <label>Product ID <input id="tr-product-id" value="prod-001" /></label>
+          <label>Product Name <input id="tr-product-name" value="Phone X" /></label>
+          <label>Objective <input id="tr-objective" value="new product pitch training" /></label>
+          <label>Required Points <input id="tr-required" value="battery life, camera quality, after-sales" /></label>
+          <label>Installments Fact <input id="tr-installments" value="12 installments" /></label>
+        </div>
+        <div class="actions">
+          <button id="btn-create-course">1) Create Course</button>
+          <button id="btn-generate-content">2) Generate Content</button>
+        </div>
+
+        <div class="form-grid">
+          <label>User ID <input id="tr-user" value="guide-001" /></label>
+          <label>Mock Transcript
+            <textarea id="tr-transcript" rows="4">This product has battery life and camera quality. We support 24 installments ...</textarea>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="btn-create-attempt">3) Submit Attempt</button>
+          <button id="btn-evaluate-attempt">4) Evaluate Attempt</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Cross-Platform Comparison</h2>
+        <div class="form-grid">
+          <label>Source Product ID <input id="cp-source-id" value="prod-001" /></label>
+          <label>Source Product Name <input id="cp-source-name" value="Phone X" /></label>
+          <label>JD URL <input id="cp-jd-url" value="https://item.jd.com/mock" /></label>
+          <label>Taobao URL <input id="cp-taobao-url" value="https://detail.tmall.com/mock" /></label>
+        </div>
+        <div class="actions">
+          <button id="btn-create-comparison">1) Create Comparison Task</button>
+          <button id="btn-run-comparison">2) Run Comparison</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Task Result</h2>
+        <div class="actions inline">
+          <input id="task-id" placeholder="task_id" />
+          <button id="btn-check-task">Check Task</button>
+        </div>
+        <pre id="output"></pre>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
