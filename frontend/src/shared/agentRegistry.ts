@@ -23,8 +23,9 @@ const SPRITE_MAP: Record<string, string> = {
   data_engineer: 'char_04',
   data_analyst: 'char_05',
   graphic_designer: 'char_06',
+  price_comparator: 'char_07',
 };
-let nextSpriteIndex = 7; // 用户自定义 agent 从 char_07 开始
+let nextSpriteIndex = 8; // 用户自定义 agent 从 char_08 开始
 
 export function getSpriteKey(slug: string): string {
   if (SPRITE_MAP[slug]) return SPRITE_MAP[slug];
@@ -46,6 +47,7 @@ const FALLBACK_AGENTS: AgentRegistryEntry[] = [
   { slug: 'product_specialist', displayName: '理货员', role: '商品数据与库存', color: '#60a5fa', roomId: 'datacenter', phaserAgentId: 'agt_inventory', isDispatcher: false },
   { slug: 'data_engineer', displayName: '数据工程师', role: '数据管理与上传', color: '#a78bfa', roomId: 'datacenter', phaserAgentId: 'agt_data_eng', isDispatcher: false },
   { slug: 'data_analyst', displayName: '数据分析师', role: '数据分析与洞察', color: '#f59e0b', roomId: 'datacenter', phaserAgentId: 'agt_data_analyst', isDispatcher: false },
+  { slug: 'price_comparator', displayName: '比价专员', role: '跨平台商品比价', color: '#f97316', roomId: 'workspace', phaserAgentId: 'agt_price_cmp', isDispatcher: false },
   { slug: 'graphic_designer', displayName: '平面设计师', role: '视觉设计与图片生成', color: '#ec4899', roomId: 'workspace', phaserAgentId: 'agt_designer', isDispatcher: false },
 ];
 
