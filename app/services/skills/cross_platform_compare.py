@@ -1,12 +1,11 @@
-"""跨平台商品比价 Skill — Phase 2: LLM 语义分析。
+"""跨平台商品比价 Skill — Phase 2: LLM 语义分析 + 可插拔数据源。
 
 状态机流程：
-  INIT → on_start(query) → 搜索多平台 → yield 搜索结果 → AWAITING_USER
+  INIT → on_start(query) → DataSource 搜索多平台 → yield 搜索结果 → AWAITING_USER
   AWAITING_USER → on_resume(selected_ids) → LLM 语义比价分析 → yield 比价结论 → DONE
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -17,117 +16,8 @@ log = logging.getLogger(__name__)
 
 
 # ============================================================
-# Mock 多平台搜索数据（Phase 1）
+# 比价分析（算法降级 + LLM 语义分析）
 # ============================================================
-
-MOCK_SEARCH_RESULTS: Dict[str, List[Dict[str, Any]]] = {
-    "京东": [
-        {
-            "product_id": "jd_10001",
-            "name": "美的小厨宝 5L 速热即热式电热水器",
-            "brand": "美的",
-            "price": 399.0,
-            "original_price": 499.0,
-            "promotions": ["满300减50", "新用户券"],
-            "rating": 4.8,
-            "review_count": 12500,
-            "platform": "京东",
-            "url": "https://item.jd.com/mock_10001.html",
-            "image_url": "",
-        },
-        {
-            "product_id": "jd_10002",
-            "name": "海尔小厨宝 6.6L 家用厨房电热水器",
-            "brand": "海尔",
-            "price": 459.0,
-            "original_price": 599.0,
-            "promotions": ["跨店满减"],
-            "rating": 4.7,
-            "review_count": 8900,
-            "platform": "京东",
-            "url": "https://item.jd.com/mock_10002.html",
-            "image_url": "",
-        },
-        {
-            "product_id": "jd_10003",
-            "name": "史密斯小厨宝 5L 出水断电安全型",
-            "brand": "A.O.Smith",
-            "price": 699.0,
-            "original_price": 799.0,
-            "promotions": ["以旧换新补贴最高300"],
-            "rating": 4.9,
-            "review_count": 6700,
-            "platform": "京东",
-            "url": "https://item.jd.com/mock_10003.html",
-            "image_url": "",
-        },
-    ],
-    "淘宝": [
-        {
-            "product_id": "tb_20001",
-            "name": "美的小厨宝 5升即热储水式厨房热水器",
-            "brand": "美的",
-            "price": 379.0,
-            "original_price": 479.0,
-            "promotions": ["淘金币抵扣", "店铺券满200减20"],
-            "rating": 4.7,
-            "review_count": 35000,
-            "platform": "淘宝",
-            "url": "https://item.taobao.com/mock_20001.html",
-            "image_url": "",
-        },
-        {
-            "product_id": "tb_20002",
-            "name": "海尔6.6升小厨宝家用速热电热水器",
-            "brand": "海尔",
-            "price": 439.0,
-            "original_price": 569.0,
-            "promotions": ["88VIP 95折"],
-            "rating": 4.6,
-            "review_count": 21000,
-            "platform": "淘宝",
-            "url": "https://item.taobao.com/mock_20002.html",
-            "image_url": "",
-        },
-    ],
-    "拼多多": [
-        {
-            "product_id": "pdd_30001",
-            "name": "美的5L小厨宝速热式厨房电热水器",
-            "brand": "美的",
-            "price": 349.0,
-            "original_price": 399.0,
-            "promotions": ["百亿补贴"],
-            "rating": 4.5,
-            "review_count": 50000,
-            "platform": "拼多多",
-            "url": "https://mobile.yangkeduo.com/mock_30001.html",
-            "image_url": "",
-        },
-        {
-            "product_id": "pdd_30002",
-            "name": "海尔6.6L小厨宝即热式厨房电热水器",
-            "brand": "海尔",
-            "price": 419.0,
-            "original_price": 529.0,
-            "promotions": ["百亿补贴", "多人团再减10"],
-            "rating": 4.5,
-            "review_count": 28000,
-            "platform": "拼多多",
-            "url": "https://mobile.yangkeduo.com/mock_30002.html",
-            "image_url": "",
-        },
-    ],
-}
-
-
-def _all_mock_products() -> List[Dict[str, Any]]:
-    """展平所有平台的商品列表。"""
-    products = []
-    for platform_products in MOCK_SEARCH_RESULTS.values():
-        products.extend(platform_products)
-    return products
-
 
 def _build_comparison_fallback(selected: List[Dict[str, Any]]) -> Dict[str, Any]:
     """降级方案：纯算法比价（无 LLM 时使用）。"""
@@ -171,10 +61,6 @@ def _build_comparison_fallback(selected: List[Dict[str, Any]]) -> Dict[str, Any]
     }
 
 
-# ============================================================
-# LLM 语义比价分析（Phase 2）
-# ============================================================
-
 _COMPARISON_PROMPT = """\
 你是一位专业的电商比价分析师。用户选择了以下商品进行对比，请从语义层面分析它们的异同，并给出购买建议。
 
@@ -216,14 +102,19 @@ async def _build_comparison_with_llm(selected: List[Dict[str, Any]]) -> Dict[str
     """LLM 语义比价分析：理解商品语义，多维度对比，生成购买建议。"""
     from app.services.llm_service import async_chat_completion
 
-    # 构建商品描述文本
+    # 构建商品描述文本（含 specs 信息）
     products_lines = []
     for i, p in enumerate(selected, 1):
         promos = "、".join(p.get("promotions", [])) or "无"
+        specs_str = ""
+        if p.get("specs"):
+            specs_str = " | ".join(f"{k}: {v}" for k, v in p["specs"].items())
+            specs_str = f"\n   规格: {specs_str}"
         products_lines.append(
             f"{i}. 【{p['platform']}】{p['name']}\n"
             f"   品牌: {p['brand']} | 价格: ¥{p['price']} (原价 ¥{p.get('original_price', p['price'])})\n"
             f"   促销: {promos} | 评分: {p.get('rating', '-')} | 评价数: {p.get('review_count', 0)}"
+            + specs_str
         )
     products_text = "\n".join(products_lines)
 
@@ -285,6 +176,16 @@ async def _build_comparison_with_llm(selected: List[Dict[str, Any]]) -> Dict[str
 # Skill 实现
 # ============================================================
 
+def _flatten_search_results(
+    search_results: Dict[str, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """展平多平台搜索结果为单一列表。"""
+    products = []
+    for platform_products in search_results.values():
+        products.extend(platform_products)
+    return products
+
+
 class CrossPlatformCompareSkill(BaseSkill):
     """跨平台商品比价 Skill。"""
 
@@ -294,17 +195,18 @@ class CrossPlatformCompareSkill(BaseSkill):
     agent_slugs = ["shopping_guide"]
 
     async def on_start(self, params: Dict[str, Any]) -> SkillStepResult:
-        """接收搜索关键词，返回多平台搜索结果。
+        """接收搜索关键词，通过 DataSource 搜索多平台商品。
 
-        params: {"query": "小厨宝", "category": "热水器"}
+        params: {"query": "小厨宝", "platforms": ["京东", "淘宝"]}
         """
+        from app.services.datasources import get_datasource
+
         query = params.get("query", "")
+        platforms = params.get("platforms")
 
-        # 模拟网络延迟
-        await asyncio.sleep(0.3)
+        datasource = get_datasource()
+        search_results = await datasource.search(query=query, platforms=platforms)
 
-        # Phase 1: 返回全部 mock 数据
-        search_results = dict(MOCK_SEARCH_RESULTS)
         total_count = sum(len(v) for v in search_results.values())
 
         events = [
@@ -347,7 +249,9 @@ class CrossPlatformCompareSkill(BaseSkill):
         """用户选择商品后执行 LLM 语义比价分析。"""
         selected_ids = user_input.get("product_ids", [])
 
-        all_products = _all_mock_products()
+        # 从上下文中的搜索结果里查找选中的商品
+        search_results = context.get("search_results", {})
+        all_products = _flatten_search_results(search_results)
         selected = [p for p in all_products if p["product_id"] in selected_ids]
 
         if not selected:
