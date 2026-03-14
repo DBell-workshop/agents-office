@@ -263,7 +263,7 @@ class CrossPlatformCompareSkill(BaseSkill):
     name = "cross_platform_compare"
     display_name = "跨平台比价"
     description = "在多个电商平台搜索同类商品，对比价格、促销和评价，给出购买建议。也支持直接粘贴商品链接比价"
-    agent_slugs = ["shopping_guide"]
+    agent_slugs = ["price_comparator"]
 
     async def on_start(self, params: Dict[str, Any]) -> SkillStepResult:
         """根据输入自动选择模式：URL 粘贴直达比价 / 关键词搜索。"""

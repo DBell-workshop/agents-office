@@ -24,6 +24,7 @@ class Settings:
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "").strip()
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "").strip()
     deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "").strip()
+    dashscope_api_key: str = os.getenv("DASHSCOPE_API_KEY", "").strip()
 
     # ---------- 默认模型 ----------
     default_llm_model: str = os.getenv("DEFAULT_LLM_MODEL", "gemini/gemini-2.0-flash").strip()
@@ -44,6 +45,7 @@ class Settings:
             or self.anthropic_api_key
             or self.openai_api_key
             or self.deepseek_api_key
+            or self.dashscope_api_key
         )
 
 
