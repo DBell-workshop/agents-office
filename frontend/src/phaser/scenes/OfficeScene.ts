@@ -100,6 +100,31 @@ const ROOMS: Record<
 };
 
 // ============================================================
+// 公共休闲点（POI）— Agent 空闲时可能去的地方
+// ============================================================
+interface POI {
+  id: string;
+  x: number;
+  y: number;
+  nearestCorridor: string;  // 最近的走廊节点
+  action: 'drink' | 'sit' | 'look';  // 到达后的行为
+  facingDir: Direction;  // 到达后朝向
+}
+
+const POIS: POI[] = [
+  // 自动贩卖机（展示厅内）— 去买饮料
+  { id: 'vending_showroom', x: 395, y: 230, nearestCorridor: 'SHOW_DOOR', action: 'drink', facingDir: 'up' },
+  // 自动贩卖机（数据中心旁）— 去买饮料
+  { id: 'vending_data', x: 1100, y: 700, nearestCorridor: 'DATA_AREA', action: 'drink', facingDir: 'up' },
+  // 会议室中央大桌 — 去坐坐
+  { id: 'meeting_table', x: 330, y: 650, nearestCorridor: 'MEET_DOOR', action: 'sit', facingDir: 'down' },
+  // 展示厅展板前 — 看看东西
+  { id: 'showroom_display', x: 250, y: 320, nearestCorridor: 'SHOW_DOOR', action: 'look', facingDir: 'left' },
+  // 走廊中央 — 路过闲逛
+  { id: 'corridor_center', x: 620, y: 430, nearestCorridor: 'COR_CENTER', action: 'look', facingDir: 'down' },
+];
+
+// ============================================================
 // 走廊节点网络 — 基于实际墙体门口位置
 // ============================================================
 const CORRIDOR_NODES: { x: number; y: number; id: string }[] = [
@@ -757,48 +782,176 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // 空闲 Agent 随机走动
+  // 空闲 Agent 随机走动 & 公共区域串门
   // ============================================================
   private idleWander() {
     this.agents.forEach((agent) => {
-      // 正在移动或工作中的 Agent 不走动
       if (agent.isMoving) return;
-      if ((agent as any)._typingTimer) return;
+      if ((agent as any)._typingTimer) return; // 工作中不走动
+      if ((agent as any)._wandering) return;   // 已在串门中
 
-      // 30% 概率触发走动
-      if (Math.random() > 0.3) return;
+      // 25% 概率触发
+      if (Math.random() > 0.25) return;
 
-      const room = ROOMS[agent.currentRoom];
-      if (!room) return;
+      // 15% 概率去公共区域串门，85% 在房间内闲逛
+      if (Math.random() < 0.15) {
+        this.wanderToPOI(agent);
+      } else {
+        this.wanderInRoom(agent);
+      }
+    });
+  }
 
-      // 在当前房间内随机选一个站位
-      const randomSpot = room.spots[Math.floor(Math.random() * room.spots.length)];
-      const dx = randomSpot.x - agent.container.x;
-      const dy = randomSpot.y - agent.container.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+  /** 在当前房间内随机走动 */
+  private wanderInRoom(agent: AgentCharacter) {
+    const room = ROOMS[agent.currentRoom];
+    if (!room) return;
 
-      // 太近就不走了
-      if (distance < 30) return;
+    const randomSpot = room.spots[Math.floor(Math.random() * room.spots.length)];
+    const dx = randomSpot.x - agent.container.x;
+    const dy = randomSpot.y - agent.container.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 30) return;
 
-      const dir = this.getDirection(dx, dy);
-      agent.sprite.play(`${agent.spriteKey}-walk-${dir}`);
-      agent.isMoving = true;
+    const dir = this.getDirection(dx, dy);
+    agent.sprite.play(`${agent.spriteKey}-walk-${dir}`);
+    agent.isMoving = true;
 
-      this.tweens.add({
-        targets: agent.container,
-        x: randomSpot.x,
-        y: randomSpot.y,
-        duration: (distance / 60) * 1000, // 60px/s 慢速闲逛
-        ease: 'Linear',
-        onUpdate: () => {
-          agent.container.setDepth(agent.container.y);
-        },
-        onComplete: () => {
-          agent.isMoving = false;
-          agent.sprite.play(`${agent.spriteKey}-idle-down`);
-        },
+    this.tweens.add({
+      targets: agent.container,
+      x: randomSpot.x,
+      y: randomSpot.y,
+      duration: (distance / 60) * 1000,
+      ease: 'Linear',
+      onUpdate: () => { agent.container.setDepth(agent.container.y); },
+      onComplete: () => {
+        agent.isMoving = false;
+        agent.sprite.play(`${agent.spriteKey}-idle-down`);
+      },
+    });
+  }
+
+  /** 去公共休闲点串门 — 走到 POI → 执行行为动画 → 回到自己房间 */
+  private wanderToPOI(agent: AgentCharacter) {
+    const poi = POIS[Math.floor(Math.random() * POIS.length)];
+    (agent as any)._wandering = true;
+
+    // 用走廊网络走到 POI
+    const exitNode = ROOM_CORRIDOR[agent.currentRoom];
+    if (!exitNode) { (agent as any)._wandering = false; return; }
+
+    // 构建路径：当前位置 → 房间出口 → 走廊 → POI走廊 → POI
+    const corridorPath = this.findCorridorPath(exitNode, poi.nearestCorridor);
+    if (!corridorPath) { (agent as any)._wandering = false; return; }
+
+    const room = ROOMS[agent.currentRoom];
+    const fullPath = [
+      room.entry,  // 走到房间门口
+      ...corridorPath.map(id => {
+        const node = CORRIDOR_NODES.find(n => n.id === id);
+        return node ? { x: node.x, y: node.y } : room.entry;
+      }),
+      { x: poi.x, y: poi.y },  // 最终目的地
+    ];
+
+    // 走到 POI
+    agent.isMoving = true;
+    this.moveAlongPathWithCallback(agent, fullPath, 0, () => {
+      // 到达 POI — 执行行为动画
+      agent.isMoving = false;
+      agent.sprite.play(`${agent.spriteKey}-idle-${poi.facingDir}`);
+
+      // 行为效果
+      if (poi.action === 'drink') {
+        this.showAgentBubble(agent.slug, '☕', 2000);
+      } else if (poi.action === 'sit') {
+        this.showAgentBubble(agent.slug, '💤', 2500);
+      }
+
+      // 停留 3~6 秒后回家
+      const stayTime = 3000 + Math.random() * 3000;
+      this.time.delayedCall(stayTime, () => {
+        this.returnAgentHome(agent);
       });
     });
+  }
+
+  /** 让 Agent 沿路径走动，走完执行回调 */
+  private moveAlongPathWithCallback(
+    agent: AgentCharacter,
+    path: { x: number; y: number }[],
+    index: number,
+    onDone: () => void,
+  ) {
+    if (index >= path.length) {
+      onDone();
+      return;
+    }
+    const target = path[index];
+    const dx = target.x - agent.container.x;
+    const dy = target.y - agent.container.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < 4) {
+      this.moveAlongPathWithCallback(agent, path, index + 1, onDone);
+      return;
+    }
+
+    const dir = this.getDirection(dx, dy);
+    agent.sprite.play(`${agent.spriteKey}-walk-${dir}`);
+    agent.isMoving = true;
+
+    this.tweens.add({
+      targets: agent.container,
+      x: target.x,
+      y: target.y,
+      duration: (distance / 70) * 1000, // 70px/s 闲逛速度
+      ease: 'Linear',
+      onUpdate: () => { agent.container.setDepth(agent.container.y); },
+      onComplete: () => {
+        this.moveAlongPathWithCallback(agent, path, index + 1, onDone);
+      },
+    });
+  }
+
+  /** Agent 回到自己的房间 */
+  private returnAgentHome(agent: AgentCharacter) {
+    const homeRoom = ROOMS[agent.homeRoom];
+    if (!homeRoom) { (agent as any)._wandering = false; return; }
+
+    // 找回家路径
+    const currentNearestCorridor = this.findNearestCorridorNode(agent.container.x, agent.container.y);
+    const homeExit = ROOM_CORRIDOR[agent.homeRoom];
+    const corridorPath = this.findCorridorPath(currentNearestCorridor, homeExit);
+
+    const homeSpot = homeRoom.spots[Math.floor(Math.random() * homeRoom.spots.length)];
+    const returnPath = [
+      ...(corridorPath || []).map(id => {
+        const node = CORRIDOR_NODES.find(n => n.id === id);
+        return node ? { x: node.x, y: node.y } : homeRoom.entry;
+      }),
+      homeRoom.entry,
+      homeSpot,
+    ];
+
+    agent.isMoving = true;
+    this.moveAlongPathWithCallback(agent, returnPath, 0, () => {
+      agent.isMoving = false;
+      agent.currentRoom = agent.homeRoom;
+      agent.sprite.play(`${agent.spriteKey}-idle-down`);
+      (agent as any)._wandering = false;
+    });
+  }
+
+  /** 找到离坐标最近的走廊节点 */
+  private findNearestCorridorNode(x: number, y: number): string {
+    let nearest = CORRIDOR_NODES[0].id;
+    let minDist = Infinity;
+    for (const node of CORRIDOR_NODES) {
+      const d = Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2);
+      if (d < minDist) { minDist = d; nearest = node.id; }
+    }
+    return nearest;
   }
 
   shutdown() {
