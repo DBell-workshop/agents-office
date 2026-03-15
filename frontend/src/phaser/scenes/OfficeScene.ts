@@ -125,6 +125,35 @@ const POIS: POI[] = [
 ];
 
 // ============================================================
+// 状态目的地 — Agent 根据状态去不同位置
+// ============================================================
+
+/** 电脑工位 — working 状态目标（Agent 面朝上坐到电脑前） */
+const DESK_SPOTS: { x: number; y: number; room: string }[] = [
+  // workspace 工位区电脑（3台电脑，坐在椅子位置面朝上）
+  { x: 992, y: 570, room: 'workspace' },
+  { x: 1088, y: 570, room: 'workspace' },
+  { x: 1184, y: 570, room: 'workspace' },
+  { x: 1088, y: 480, room: 'workspace' },
+  { x: 1184, y: 480, room: 'workspace' },
+  // datacenter 数据中心电脑
+  { x: 992, y: 830, room: 'datacenter' },
+  { x: 1088, y: 830, room: 'datacenter' },
+  { x: 1184, y: 830, room: 'datacenter' },
+  // manager 调度中心
+  { x: 960, y: 190, room: 'manager' },
+];
+
+/** 面壁角落 — error 状态目标（Agent 面朝墙壁） */
+const SHAME_CORNERS: { x: number; y: number; room: string; facingDir: Direction }[] = [
+  { x: 195, y: 175, room: 'showroom', facingDir: 'left' },     // 展示厅左上角
+  { x: 750, y: 160, room: 'manager', facingDir: 'up' },        // 调度中心左上角
+  { x: 195, y: 610, room: 'meeting', facingDir: 'left' },      // 会议室左上角
+  { x: 810, y: 490, room: 'workspace', facingDir: 'up' },      // 工位区左上角
+  { x: 810, y: 720, room: 'datacenter', facingDir: 'up' },     // 数据中心左上角
+];
+
+// ============================================================
 // 走廊节点网络 — 基于实际墙体门口位置
 // ============================================================
 const CORRIDOR_NODES: { x: number; y: number; id: string }[] = [
@@ -704,10 +733,144 @@ export class OfficeScene extends Phaser.Scene {
     if (!agent) return;
 
     if (data.status === 'working' || data.status === 'running') {
-      this.startWorkingAnimation(agent);
+      // 先走到电脑前，再开始工作动画
+      this.moveAgentToDesk(agent, () => {
+        this.startWorkingAnimation(agent);
+      });
+    } else if (data.status === 'error') {
+      // 走到角落面壁
+      this.moveAgentToShameCorner(agent);
     } else {
+      // idle — 停止工作动画，回到房间
       this.stopWorkingAnimation(agent);
+      if ((agent as any)._atShameCorner) {
+        (agent as any)._atShameCorner = false;
+        this.returnAgentHome(agent);
+      }
     }
+  }
+
+  /** 走到最近的空闲电脑工位 */
+  private moveAgentToDesk(agent: AgentCharacter, onArrived: () => void) {
+    // 找同房间的工位，如果没有就找最近的
+    const sameRoomDesks = DESK_SPOTS.filter(d => d.room === agent.currentRoom);
+    const otherDesks = DESK_SPOTS.filter(d => d.room !== agent.currentRoom);
+    const candidates = sameRoomDesks.length > 0 ? sameRoomDesks : otherDesks;
+
+    if (candidates.length === 0) { onArrived(); return; }
+
+    // 选一个最近的
+    let closest = candidates[0];
+    let minDist = Infinity;
+    for (const desk of candidates) {
+      const d = Math.sqrt((desk.x - agent.container.x) ** 2 + (desk.y - agent.container.y) ** 2);
+      if (d < minDist) { minDist = d; closest = desk; }
+    }
+
+    // 如果已经在工位附近，直接开始工作
+    if (minDist < 40) { onArrived(); return; }
+
+    // 同房间直接走过去
+    if (closest.room === agent.currentRoom) {
+      agent.isMoving = true;
+      this.moveAlongPathWithCallback(agent, [{ x: closest.x, y: closest.y }], 0, () => {
+        agent.isMoving = false;
+        onArrived();
+      });
+    } else {
+      // 跨房间走过去
+      const exitNode = ROOM_CORRIDOR[agent.currentRoom];
+      const targetNode = ROOM_CORRIDOR[closest.room];
+      if (!exitNode || !targetNode) { onArrived(); return; }
+
+      const corridorPath = this.findCorridorPath(exitNode, targetNode);
+      if (!corridorPath) { onArrived(); return; }
+
+      const room = ROOMS[agent.currentRoom];
+      const targetRoom = ROOMS[closest.room];
+      const fullPath = [
+        room.entry,
+        ...corridorPath.map(id => {
+          const node = CORRIDOR_NODES.find(n => n.id === id);
+          return node ? { x: node.x, y: node.y } : room.entry;
+        }),
+        targetRoom.entry,
+        { x: closest.x, y: closest.y },
+      ];
+
+      agent.isMoving = true;
+      this.moveAlongPathWithCallback(agent, fullPath, 0, () => {
+        agent.isMoving = false;
+        agent.currentRoom = closest.room;
+        onArrived();
+      });
+    }
+  }
+
+  /** 走到最近的面壁角落 */
+  private moveAgentToShameCorner(agent: AgentCharacter) {
+    this.stopWorkingAnimation(agent);
+
+    // 找同房间的角落
+    const sameRoom = SHAME_CORNERS.filter(c => c.room === agent.currentRoom);
+    const corner = sameRoom.length > 0
+      ? sameRoom[Math.floor(Math.random() * sameRoom.length)]
+      : SHAME_CORNERS[Math.floor(Math.random() * SHAME_CORNERS.length)];
+
+    const walkToCorner = () => {
+      agent.isMoving = true;
+      this.moveAlongPathWithCallback(agent, [{ x: corner.x, y: corner.y }], 0, () => {
+        agent.isMoving = false;
+        (agent as any)._atShameCorner = true;
+
+        // 面朝墙壁
+        agent.sprite.play(`${agent.spriteKey}-idle-${corner.facingDir}`);
+
+        // 头顶显示错误气泡
+        this.showAgentBubble(agent.slug, '🐛 ...', 5000);
+
+        // 轻微抖动效果（表示沮丧）
+        this.tweens.add({
+          targets: agent.container,
+          x: corner.x - 2,
+          duration: 100,
+          yoyo: true,
+          repeat: 5,
+          onComplete: () => {
+            agent.container.x = corner.x;
+          },
+        });
+      });
+    };
+
+    // 如果角落在不同房间，需要先走过去
+    if (corner.room !== agent.currentRoom) {
+      const exitNode = ROOM_CORRIDOR[agent.currentRoom];
+      const targetNode = ROOM_CORRIDOR[corner.room];
+      if (exitNode && targetNode) {
+        const corridorPath = this.findCorridorPath(exitNode, targetNode);
+        if (corridorPath) {
+          const room = ROOMS[agent.currentRoom];
+          const targetRoom = ROOMS[corner.room];
+          const pathToRoom = [
+            room.entry,
+            ...corridorPath.map(id => {
+              const node = CORRIDOR_NODES.find(n => n.id === id);
+              return node ? { x: node.x, y: node.y } : room.entry;
+            }),
+            targetRoom.entry,
+          ];
+          agent.isMoving = true;
+          this.moveAlongPathWithCallback(agent, pathToRoom, 0, () => {
+            agent.isMoving = false;
+            agent.currentRoom = corner.room;
+            walkToCorner();
+          });
+          return;
+        }
+      }
+    }
+    walkToCorner();
   }
 
   private startWorkingAnimation(agent: AgentCharacter) {
