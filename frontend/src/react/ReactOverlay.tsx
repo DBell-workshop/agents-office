@@ -4,6 +4,7 @@ import { getAgentsCached, loadAgentRegistry } from '../shared/agentRegistry';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { AgentStatusBar } from './AgentStatusBar';
 import { ChatBox } from './ChatBox';
+// import { CollectorPanel } from './CollectorPanel';  // 采集功能暂停，改为接口导入模式
 import { DatabasePanel } from './DatabasePanel';
 
 // 错误边界：防止子面板崩溃导致整个 UI 消失
@@ -68,6 +69,7 @@ export const ReactOverlay: React.FC = () => {
   const [sceneReady, setSceneReady] = useState(false);
   const [configAgent, setConfigAgent] = useState<AgentClickData | null>(null);
   const [showDatabase, setShowDatabase] = useState(false);
+  const [showCollector, setShowCollector] = useState(false);
   const [agentCount, setAgentCount] = useState(6);
 
   // 初始化 agent 计数
@@ -95,9 +97,12 @@ export const ReactOverlay: React.FC = () => {
 
     // 事件驱动打开数据库面板（从 AgentConfigPanel 内的按钮触发）
     const onOpenDatabase = () => {
-      setConfigAgent(null); // 关闭配置面板
+      setConfigAgent(null);
       setShowDatabase(true);
     };
+
+    // 采集面板事件已暂停
+    // const onOpenCollector = () => { setConfigAgent(null); setShowCollector(true); };
 
     EventBus.on('scene:ready', onSceneReady);
     EventBus.on('agent:clicked', onAgentClicked);
@@ -118,6 +123,7 @@ export const ReactOverlay: React.FC = () => {
       if (e.key === 'Escape') {
         setConfigAgent(null);
         setShowDatabase(false);
+        setShowCollector(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -183,6 +189,14 @@ export const ReactOverlay: React.FC = () => {
           onClose={() => setConfigAgent(null)}
         />
       )}
+
+      {/* 浏览器采集面板 */}
+      {/* 采集面板暂停使用 */}
+      {/* {showCollector && (
+        <PanelErrorBoundary onError={() => setShowCollector(false)}>
+          <CollectorPanel onClose={() => setShowCollector(false)} />
+        </PanelErrorBoundary>
+      )} */}
 
       {/* 数据库可视化面板 */}
       {showDatabase && (

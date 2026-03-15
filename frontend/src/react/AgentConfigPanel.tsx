@@ -345,6 +345,35 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
               </div>
             </div>
 
+            {/* 比价专员专属：采集数据入口（暂停使用，改为接口导入模式）*/}
+            {/* agentSlug === 'price_comparator' && (
+              <div style={{
+                marginTop: 8,
+                padding: '12px 14px',
+                background: 'rgba(96, 165, 250, 0.08)',
+                border: '1px solid rgba(96, 165, 250, 0.3)',
+                borderRadius: 6,
+              }}>
+                <div style={{ fontSize: 13, color: '#60a5fa', fontWeight: 'bold', marginBottom: 8 }}>
+                  比价专员工具
+                </div>
+                <button
+                  onClick={() => EventBus.emit('collector:open')}
+                  style={{
+                    ...styles.dbBtn,
+                    background: 'rgba(96, 165, 250, 0.2)',
+                    border: '1px solid #60a5fa',
+                    color: '#60a5fa',
+                  }}
+                >
+                  采集数据
+                </button>
+                <div style={{ ...styles.hint, marginTop: 6 }}>
+                  打开浏览器采集面板，从京东/淘宝/拼多多等平台采集商品数据
+                </div>
+              </div>
+            ) */}
+
             {/* 数据工程师专属：数据库管理入口 */}
             {agentSlug === 'data_engineer' && (
               <div style={{

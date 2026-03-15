@@ -1,7 +1,7 @@
 """浏览器采集数据源 — LLM 驱动的通用网页商品信息提取。
 
 核心思想：
-  - Playwright 控制浏览器，模拟人类浏览行为
+  - Patchright（反检测 Playwright）控制浏览器，模拟人类浏览行为
   - LLM 负责"看"页面内容并提取结构化商品数据
   - 不包含任何网站特定的 DOM/CSS 选择器，完全通用
   - 平台配置（搜索URL模板等）通过 YAML 管理，代码零耦合
@@ -25,14 +25,8 @@ log = logging.getLogger(__name__)
 
 _CONFIG_PATH = Path(__file__).parent / "platform_configs.yaml"
 
-# User-Agent 池，随机轮换
-_USER_AGENTS = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-]
+
+
 
 
 # ============================================================
@@ -167,30 +161,25 @@ class BrowserDataSource(ProductDataSource):
     # ----------------------------------------------------------------
 
     async def _ensure_browser(self):
-        """懒初始化浏览器实例。"""
+        """懒初始化浏览器实例（使用 Patchright 反检测）。"""
         if self._browser is not None:
             return
 
         try:
-            from playwright.async_api import async_playwright
+            from patchright.async_api import async_playwright
         except ImportError:
             raise RuntimeError(
-                "playwright 未安装。请执行: pip install playwright && python -m playwright install chromium"
+                "patchright 未安装。请执行: pip install patchright && patchright install chrome"
             )
 
         self._playwright = await async_playwright().start()
         bcfg = self._browser_config
         self._browser = await self._playwright.chromium.launch(
             headless=bcfg.get("headless", True),
+            channel="chrome",  # 使用真实 Chrome
         )
-        viewport = bcfg.get("viewport", {})
-        self._context = await self._browser.new_context(
-            viewport={
-                "width": viewport.get("width", 1280),
-                "height": viewport.get("height", 800),
-            },
-            user_agent=random.choice(_USER_AGENTS),
-        )
+        # 不自定义 User-Agent — 让真实 Chrome 报告自身 UA
+        self._context = await self._browser.new_context()
 
     async def close(self):
         """关闭浏览器资源。"""
@@ -228,13 +217,18 @@ class BrowserDataSource(ProductDataSource):
 
     async def _extract_page_text(self, page) -> str:
         """提取页面可见文本内容（text 模式）。"""
-        # 获取页面主体文本，过滤掉脚本和样式
+        # 等待 body 存在
+        try:
+            await page.wait_for_selector("body", timeout=10000)
+        except Exception:
+            log.warning("等待 body 超时，尝试直接提取")
+
         text = await page.evaluate("""
             () => {
-                // 移除 script 和 style 标签的影响
+                if (!document.body) return '[页面body为空]';
                 const clone = document.body.cloneNode(true);
                 clone.querySelectorAll('script, style, noscript, iframe').forEach(el => el.remove());
-                return clone.innerText;
+                return clone.innerText || '[页面无可见文本]';
             }
         """)
         # 截断过长文本以控制 token 消耗
@@ -357,7 +351,10 @@ class BrowserDataSource(ProductDataSource):
         page = await self._context.new_page()
         try:
             timeout = self._browser_config.get("page_timeout", 30) * 1000
-            await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+            try:
+                await page.goto(url, timeout=timeout, wait_until="load")
+            except Exception as nav_err:
+                log.warning("页面导航异常 (%s)，尝试继续: %s", url, nav_err)
 
             # 等待页面动态内容加载
             wait_time = platform_cfg.get("page_load_wait", 3)
@@ -367,8 +364,12 @@ class BrowserDataSource(ProductDataSource):
             scroll_times = platform_cfg.get("scroll_times", 2)
             await self._human_scroll(page, scroll_times)
 
+            # 额外等待确保懒加载完成
+            await asyncio.sleep(1)
+
             # 提取页面内容
             page_content = await self._extract_page_text(page)
+            log.info("页面文本长度: %d 字符", len(page_content))
 
             max_products = self._browser_config.get("max_products_per_platform", 5)
             hints = platform_cfg.get("hints", "")
@@ -395,11 +396,16 @@ class BrowserDataSource(ProductDataSource):
         page = await self._context.new_page()
         try:
             timeout = self._browser_config.get("page_timeout", 30) * 1000
-            await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+            try:
+                await page.goto(url, timeout=timeout, wait_until="load")
+            except Exception as nav_err:
+                log.warning("商品页导航异常 (%s)，尝试继续: %s", url, nav_err)
             await asyncio.sleep(3)
             await self._human_scroll(page, 2)
+            await asyncio.sleep(1)
 
             page_content = await self._extract_page_text(page)
+            log.info("商品页文本长度: %d 字符", len(page_content))
             product = await self._llm_extract_product_detail(page_content)
 
             if product and not product.get("url"):

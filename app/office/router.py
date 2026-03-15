@@ -1,6 +1,7 @@
 """AgentsOffice 容器层 API Router -- 挂载到 /api/v1/office/。"""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.models import ApiEnvelope, make_id
+from app.models import ApiEnvelope, ProductImportRequest, make_id
 from app.office.models import (
     AgentCreateRequest,
     AgentSkillBindRequest,
@@ -385,33 +386,51 @@ async def chat_direct_stream(payload: DirectChatRequest):
 
             yield f"event: init\ndata: {json.dumps({'conversation_id': conversation_id})}\n\n"
 
-            async for event in run_agent_stream(
-                agent_slug=payload.agent_slug,
-                agent_defn=agent_defn,
-                user_message=payload.message,
-                task_summary=payload.message,
-                conversation_history=payload.history or None,
-                model=target_model,
-                api_base=agent_api_base,
-                api_key=agent_api_key,
-            ):
-                event_type = event["event"]
-                event_data = event["data"]
+            # 检查该 Agent 是否有可用的 Skill — 如果有，优先走 Skill 流程
+            from app.services.skills.registry import get_skills_for_agent
+            agent_skills = get_skills_for_agent(payload.agent_slug)
 
-                if event_type in ("process", "message") and office_store is not None:
-                    try:
-                        office_store.add_chat_message(
-                            conversation_id=conversation_id,
-                            role=event_data.get("role", "agent"),
-                            content=event_data.get("content", ""),
-                            agent_slug=event_data.get("agent_slug"),
-                            agent_name=event_data.get("agent_name"),
-                            message_type=event_data.get("message_type"),
-                        )
-                    except Exception:
-                        logger.warning("Failed to persist agent message")
+            if agent_skills:
+                # 有 Skill → 走 SkillEngine（比价专员等）
+                from app.services.skills.engine import SkillEngine
+                skill = agent_skills[0]  # 取第一个匹配的 Skill
+                async for event in SkillEngine.start_skill(
+                    skill_name=skill.name,
+                    agent_slug=payload.agent_slug,
+                    params={"query": payload.message},
+                ):
+                    event_type = event["event"]
+                    event_data = event["data"]
+                    yield f"event: {event_type}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+            else:
+                # 无 Skill → 走普通 LLM 对话
+                async for event in run_agent_stream(
+                    agent_slug=payload.agent_slug,
+                    agent_defn=agent_defn,
+                    user_message=payload.message,
+                    task_summary=payload.message,
+                    conversation_history=payload.history or None,
+                    model=target_model,
+                    api_base=agent_api_base,
+                    api_key=agent_api_key,
+                ):
+                    event_type = event["event"]
+                    event_data = event["data"]
 
-                yield f"event: {event_type}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                    if event_type in ("process", "message") and office_store is not None:
+                        try:
+                            office_store.add_chat_message(
+                                conversation_id=conversation_id,
+                                role=event_data.get("role", "agent"),
+                                content=event_data.get("content", ""),
+                                agent_slug=event_data.get("agent_slug"),
+                                agent_name=event_data.get("agent_name"),
+                                message_type=event_data.get("message_type"),
+                            )
+                        except Exception:
+                            logger.warning("Failed to persist agent message")
+
+                    yield f"event: {event_type}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
 
             yield f"event: done\ndata: {json.dumps({'conversation_id': conversation_id})}\n\n"
 
@@ -1329,3 +1348,176 @@ def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
         return dt
     except (ValueError, TypeError):
         return None
+
+
+# ================================================================
+# 商品数据接入 API — 接收外部采集系统推送的商品数据
+# ================================================================
+
+
+@router.post("/products/import")
+async def products_import(payload: ProductImportRequest) -> ApiEnvelope:
+    """批量导入商品数据。
+
+    外部采集系统（爬虫、人工录入、合作方API）按标准格式推送商品数据。
+    本接口负责接收、校验、存储，供比价等下游功能消费。
+
+    示例请求体::
+
+        {
+          "source": "jd_crawler",
+          "batch_id": "batch_20260315_001",
+          "products": [
+            {
+              "product_id": "100012345",
+              "platform": "京东",
+              "name": "海尔洗衣机 10KG 滚筒",
+              "price": 2999.0,
+              "url": "https://item.jd.com/100012345.html",
+              "images": [{"url": "https://img.jd.com/xxx.jpg", "type": "main"}],
+              "specs": [{"name": "容量", "value": "10KG"}]
+            }
+          ]
+        }
+    """
+    trace_id = make_id("trc")
+    store = _require_store()
+    try:
+        # 将 Pydantic 模型转为 dict 列表
+        product_dicts = [item.model_dump() for item in payload.products]
+        # 图片和规格需要序列化为 plain dict
+        for d in product_dicts:
+            d["images"] = [img if isinstance(img, dict) else img.model_dump() for img in (d.get("images") or [])]
+            d["specs"] = [sp if isinstance(sp, dict) else sp.model_dump() for sp in (d.get("specs") or [])]
+
+        batch_id = payload.batch_id or make_id("batch")
+        results = store.save_products(
+            products=product_dicts,
+            source=payload.source,
+            batch_id=batch_id,
+        )
+        logger.info(
+            "导入商品数据: source=%s, batch_id=%s, count=%d",
+            payload.source, batch_id, len(results),
+        )
+        return _envelope(trace_id=trace_id, data={
+            "imported_count": len(results),
+            "batch_id": batch_id,
+            "products": results,
+        })
+    except Exception as e:
+        logger.exception("商品数据导入失败")
+        return _envelope(trace_id=trace_id, data={}, error=str(e)[:200])
+
+
+@router.get("/products")
+def list_products(
+    platform: Optional[str] = Query(None, description="按平台筛选"),
+    category: Optional[str] = Query(None, description="按类目筛选"),
+    keyword: Optional[str] = Query(None, description="商品名关键词搜索"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> ApiEnvelope:
+    """查询已导入的商品列表。"""
+    trace_id = make_id("trc")
+    store = _require_store()
+    products = store.list_products(
+        platform=platform, category=category, keyword=keyword,
+        limit=limit, offset=offset,
+    )
+    total = store.count_products(platform=platform, category=category, keyword=keyword)
+    return _envelope(trace_id=trace_id, data={
+        "products": products,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    })
+
+
+@router.get("/products/schema")
+def products_import_schema() -> ApiEnvelope:
+    """返回商品导入接口的 JSON Schema，方便外部系统对接。"""
+    from app.models import ProductImportRequest
+
+    trace_id = make_id("trc")
+    return _envelope(trace_id=trace_id, data={
+        "schema": ProductImportRequest.model_json_schema(),
+    })
+
+
+# ================================================================
+# 浏览器采集器 API — 用户参与式数据采集（暂停使用，代码保留）
+# 如需重新启用，取消下方注释并恢复前端入口即可
+# ================================================================
+
+# class CollectorOpenRequest(BaseModel):
+#     start_url: str = "https://www.jd.com"
+
+
+# @router.post("/collector/open")
+# async def collector_open(payload: CollectorOpenRequest) -> ApiEnvelope:
+#     """启动可见浏览器窗口，用户可手动登录电商平台。"""
+#     trace_id = make_id("trc")
+#     try:
+#         from app.services.collector import get_or_create_collector
+#         collector = await get_or_create_collector()
+#         await collector.open_browser(start_url=payload.start_url)
+#         return _envelope(trace_id=trace_id, data=collector.get_status())
+#     except Exception as e:
+#         logger.exception("打开采集浏览器失败")
+#         return _envelope(trace_id=trace_id, data={}, error=str(e)[:200])
+
+# @router.get("/collector/status")
+# def collector_status() -> ApiEnvelope:
+#     trace_id = make_id("trc")
+#     from app.services.collector import get_collector_status
+#     return _envelope(trace_id=trace_id, data=get_collector_status())
+
+# @router.post("/collector/close")
+# async def collector_close() -> ApiEnvelope:
+#     trace_id = make_id("trc")
+#     from app.services.collector import close_collector
+#     await close_collector()
+#     return _envelope(trace_id=trace_id, data={"closed": True})
+
+# @router.get("/collector/products")
+# async def collector_products() -> ApiEnvelope:
+#     trace_id = make_id("trc")
+#     from app.services.collector import get_or_create_collector
+#     try:
+#         collector = await get_or_create_collector()
+#         return _envelope(trace_id=trace_id, data={"products": collector.products, "count": len(collector.products)})
+#     except Exception as e:
+#         return _envelope(trace_id=trace_id, data={"products": [], "count": 0}, error=str(e)[:200])
+
+# @router.get("/collector/events")
+# async def collector_events():
+#     from app.services.collector import get_or_create_collector
+#     collector = await get_or_create_collector()
+#     async def event_generator():
+#         try:
+#             while collector.status not in ("closed", "idle"):
+#                 try:
+#                     event = await asyncio.wait_for(collector.event_queue.get(), timeout=30.0)
+#                     yield f"event: collector\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+#                 except asyncio.TimeoutError:
+#                     yield f"event: heartbeat\ndata: {json.dumps({'status': collector.status})}\n\n"
+#         except asyncio.CancelledError:
+#             pass
+#     return StreamingResponse(event_generator(), media_type="text/event-stream",
+#         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
+
+
+# @router.get("/collector/logs")
+# def collector_logs(limit: int = Query(default=200, ge=1, le=1000)) -> ApiEnvelope:
+#     trace_id = make_id("trc")
+#     from app.services.collector.log_store import get_logs
+#     logs = get_logs(limit=limit)
+#     return _envelope(trace_id=trace_id, data={"logs": logs, "count": len(logs)})
+
+# @router.delete("/collector/logs")
+# def collector_logs_clear() -> ApiEnvelope:
+#     trace_id = make_id("trc")
+#     from app.services.collector.log_store import clear_logs
+#     count = clear_logs()
+#     return _envelope(trace_id=trace_id, data={"deleted": count})

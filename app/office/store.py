@@ -18,6 +18,7 @@ from app.db.orm_models import (
     ConversationRow,
     CostRecordRow,
     ModelPricingRow,
+    ProductRow,
     SkillRow,
     TaskRow,
 )
@@ -701,6 +702,159 @@ class OfficeStore:
             "message_type": row.message_type,
             "metadata": row.extra_metadata or {},
             "created_at": _dt_to_iso(row.created_at),
+        }
+
+    # ================================================================
+    # Product CRUD — 商品数据持久化
+    # ================================================================
+
+    def save_products(
+        self,
+        products: List[Dict[str, Any]],
+        source: str,
+        batch_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """批量导入商品数据，已存在的 product_id+platform 组合会更新。
+
+        Args:
+            products: ProductImportItem 转换后的 dict 列表
+            source: 数据来源标识
+            batch_id: 外部批次号
+
+        Returns:
+            导入结果列表 [{product_id, platform, name, status: "created"|"updated"}]
+        """
+        results = []
+        with self.SessionFactory() as session:
+            for item in products:
+                # 用 platform + product_id 构造唯一 key
+                pk = f"{item['platform']}_{item['product_id']}"
+                existing = session.get(ProductRow, pk)
+
+                # 将完整数据打包为 raw_data 和 attributes
+                raw_data = {
+                    "source": source,
+                    "batch_id": batch_id,
+                    "price": item.get("price"),
+                    "original_price": item.get("original_price"),
+                    "url": item.get("url"),
+                    "shop_name": item.get("shop_name"),
+                    "images": item.get("images", []),
+                    "video_url": item.get("video_url"),
+                    "specs": item.get("specs", []),
+                    "description": item.get("description"),
+                    "promotions": item.get("promotions", []),
+                    "rating": item.get("rating"),
+                    "review_count": item.get("review_count"),
+                    "sales_count": item.get("sales_count"),
+                    "extra": item.get("extra", {}),
+                }
+                attributes = {
+                    "specs": item.get("specs", []),
+                    "promotions": item.get("promotions", []),
+                }
+
+                if existing:
+                    existing.name = item["name"]
+                    existing.brand = item.get("brand")
+                    existing.category = item.get("category")
+                    existing.source_url = item.get("url")
+                    existing.attributes = attributes
+                    existing.raw_data = raw_data
+                    status = "updated"
+                else:
+                    row = ProductRow(
+                        product_id=pk,
+                        sku=item["product_id"],
+                        name=item["name"],
+                        category=item.get("category"),
+                        brand=item.get("brand"),
+                        source_platform=item["platform"],
+                        source_url=item.get("url"),
+                        attributes=attributes,
+                        raw_data=raw_data,
+                    )
+                    session.add(row)
+                    status = "created"
+
+                results.append({
+                    "product_id": item["product_id"],
+                    "platform": item["platform"],
+                    "name": item["name"],
+                    "price": item.get("price"),
+                    "status": status,
+                })
+            session.commit()
+        return results
+
+    def get_product(self, product_id: str) -> Optional[Dict[str, Any]]:
+        """按主键查询商品。"""
+        with self.SessionFactory() as session:
+            row = session.get(ProductRow, product_id)
+            if row is None:
+                return None
+            return self._product_row_to_dict(row)
+
+    def list_products(
+        self,
+        platform: Optional[str] = None,
+        category: Optional[str] = None,
+        keyword: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """查询商品列表，支持按平台、类目、关键词筛选。"""
+        with self.SessionFactory() as session:
+            q = session.query(ProductRow)
+            if platform:
+                q = q.filter(ProductRow.source_platform == platform)
+            if category:
+                q = q.filter(ProductRow.category == category)
+            if keyword:
+                q = q.filter(ProductRow.name.ilike(f"%{keyword}%"))
+            q = q.order_by(ProductRow.updated_at.desc()).offset(offset).limit(limit)
+            return [self._product_row_to_dict(r) for r in q.all()]
+
+    def count_products(
+        self,
+        platform: Optional[str] = None,
+        category: Optional[str] = None,
+        keyword: Optional[str] = None,
+    ) -> int:
+        """统计商品数量（筛选条件与 list_products 一致）。"""
+        with self.SessionFactory() as session:
+            q = session.query(sa_func.count(ProductRow.product_id))
+            if platform:
+                q = q.filter(ProductRow.source_platform == platform)
+            if category:
+                q = q.filter(ProductRow.category == category)
+            if keyword:
+                q = q.filter(ProductRow.name.ilike(f"%{keyword}%"))
+            return q.scalar() or 0
+
+    @staticmethod
+    def _product_row_to_dict(row: ProductRow) -> Dict[str, Any]:
+        raw = row.raw_data or {}
+        return {
+            "product_id": row.product_id,
+            "sku": row.sku,
+            "name": row.name,
+            "category": row.category,
+            "brand": row.brand,
+            "platform": row.source_platform,
+            "url": row.source_url,
+            "price": raw.get("price"),
+            "original_price": raw.get("original_price"),
+            "shop_name": raw.get("shop_name"),
+            "images": raw.get("images", []),
+            "specs": raw.get("specs", []),
+            "description": raw.get("description"),
+            "promotions": raw.get("promotions", []),
+            "rating": raw.get("rating"),
+            "review_count": raw.get("review_count"),
+            "sales_count": raw.get("sales_count"),
+            "created_at": _dt_to_iso(row.created_at),
+            "updated_at": _dt_to_iso(row.updated_at),
         }
 
     # ================================================================
