@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
 import { loadAgentRegistry, getAgentsCached } from '../shared/agentRegistry';
+import { t } from '../shared/i18n';
 
 // 模型名称显示映射 — 从 /api/v1/office/models 动态加载
 let MODEL_DISPLAY_NAMES: Record<string, string> = {};
@@ -189,9 +190,9 @@ export const AgentStatusBar: React.FC = () => {
 
   const statusLabel = (s: AgentStatus) => {
     switch (s) {
-      case 'working': return '工作中';
-      case 'standby': return '待命';
-      default: return '空闲';
+      case 'working': return t('status.running');
+      case 'standby': return t('status.idle');
+      default: return t('status.idle');
     }
   };
 
@@ -215,11 +216,11 @@ export const AgentStatusBar: React.FC = () => {
       <div
         onClick={() => setExpanded(!expanded)}
         style={styles.toggleBtn}
-        title={expanded ? '收起详情' : '展开详情'}
+        title={expanded ? t('status.collapse') : t('status.expand')}
       >
         <span style={{ fontSize: 10 }}>{expanded ? '▼' : '▲'}</span>
         <span style={{ fontSize: 11 }}>
-          {expanded ? '收起' : '详情'}
+          {expanded ? t('status.collapse_short') : t('status.details')}
         </span>
       </div>
 
@@ -279,7 +280,7 @@ export const AgentStatusBar: React.FC = () => {
                         {agent.active ? '\u25cf' : '\u25cb'}
                       </span>
                       <span style={{ color: agent.active ? '#ddcc88' : '#aa9977', fontSize: '11px' }}>
-                        {agent.active ? `${agent.modelDisplay}` : '未配置'}
+                        {agent.active ? `${agent.modelDisplay}` : t('config.selectModel')}
                       </span>
                     </div>
 
@@ -290,11 +291,11 @@ export const AgentStatusBar: React.FC = () => {
                     }}>
                       {agent.active ? (
                         <span style={{ color: '#ccaa66', fontSize: '11px' }}>
-                          消耗 {formatTokens(totalTokens)} tokens
+                          {t('status.tokens', { count: formatTokens(totalTokens) })}
                         </span>
                       ) : (
                         <span style={{ color: '#887766', fontSize: '11px' }}>
-                          点击配置
+                          {t('config.title')}
                         </span>
                       )}
                     </div>

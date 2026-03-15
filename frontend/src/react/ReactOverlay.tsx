@@ -4,10 +4,10 @@ import { getAgentsCached, loadAgentRegistry } from '../shared/agentRegistry';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { AgentStatusBar } from './AgentStatusBar';
 import { ChatBox } from './ChatBox';
-// import { CollectorPanel } from './CollectorPanel';  // 采集功能暂停，改为接口导入模式
 import { DatabasePanel } from './DatabasePanel';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { t } from '../shared/i18n';
 
-// 错误边界：防止子面板崩溃导致整个 UI 消失
 class PanelErrorBoundary extends Component<
   { children: React.ReactNode; onError?: () => void },
   { hasError: boolean; errorMsg: string }
@@ -34,7 +34,7 @@ class PanelErrorBoundary extends Component<
             color: '#ff6b6b', maxWidth: 400, textAlign: 'center' as const,
           }}>
             <div style={{ fontSize: 28, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontSize: 14, marginBottom: 8 }}>面板加载出错</div>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>{t('common.panelError')}</div>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>{this.state.errorMsg}</div>
             <button
               onClick={() => {
@@ -47,7 +47,7 @@ class PanelErrorBoundary extends Component<
                 fontFamily: 'monospace', fontSize: 13,
               }}
             >
-              关闭
+              {t('common.close')}
             </button>
           </div>
         </div>
@@ -72,7 +72,6 @@ export const ReactOverlay: React.FC = () => {
   const [showCollector, setShowCollector] = useState(false);
   const [agentCount, setAgentCount] = useState(6);
 
-  // 初始化 agent 计数
   useEffect(() => {
     setAgentCount(getAgentsCached().length);
     loadAgentRegistry().then((entries) => {
@@ -83,7 +82,6 @@ export const ReactOverlay: React.FC = () => {
   useEffect(() => {
     const onSceneReady = () => setSceneReady(true);
 
-    // Phaser 精灵点击 → 打开配置面板（动态查找 agent）
     const onAgentClicked = (data: { agentId: string; name: string }) => {
       const agents = getAgentsCached();
       const agent = agents.find((a) => a.phaserAgentId === data.agentId);
@@ -92,17 +90,12 @@ export const ReactOverlay: React.FC = () => {
       }
     };
 
-    // 状态栏卡片点击 → 打开配置面板
     const onConfigOpen = (data: AgentClickData) => setConfigAgent(data);
 
-    // 事件驱动打开数据库面板（从 AgentConfigPanel 内的按钮触发）
     const onOpenDatabase = () => {
       setConfigAgent(null);
       setShowDatabase(true);
     };
-
-    // 采集面板事件已暂停
-    // const onOpenCollector = () => { setConfigAgent(null); setShowCollector(true); };
 
     EventBus.on('scene:ready', onSceneReady);
     EventBus.on('agent:clicked', onAgentClicked);
@@ -117,7 +110,6 @@ export const ReactOverlay: React.FC = () => {
     };
   }, []);
 
-  // ESC 关闭面板
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -132,7 +124,6 @@ export const ReactOverlay: React.FC = () => {
 
   return (
     <>
-      {/* 顶部状态栏 */}
       {sceneReady && (
         <div style={{
           position: 'absolute',
@@ -152,11 +143,11 @@ export const ReactOverlay: React.FC = () => {
         }}>
           <span>AgentsOffice v0.1</span>
           <span style={{ color: '#88cc99' }}>|</span>
-          <span>Agents: {agentCount}/{MAX_AGENTS}</span>
+          <span>{t('status.agents', { count: String(agentCount), max: String(MAX_AGENTS) })}</span>
           {agentCount < MAX_AGENTS && (
             <button
               onClick={() => EventBus.emit('agent:add-new', {})}
-              title="添加新 Agent"
+              title={t('status.addAgent')}
               style={{
                 background: '#4ade80',
                 color: '#000',
@@ -177,10 +168,10 @@ export const ReactOverlay: React.FC = () => {
               +
             </button>
           )}
+          <LanguageSwitcher />
         </div>
       )}
 
-      {/* Agent 配置面板 */}
       {configAgent && (
         <AgentConfigPanel
           agentSlug={configAgent.agentSlug}
@@ -190,25 +181,13 @@ export const ReactOverlay: React.FC = () => {
         />
       )}
 
-      {/* 浏览器采集面板 */}
-      {/* 采集面板暂停使用 */}
-      {/* {showCollector && (
-        <PanelErrorBoundary onError={() => setShowCollector(false)}>
-          <CollectorPanel onClose={() => setShowCollector(false)} />
-        </PanelErrorBoundary>
-      )} */}
-
-      {/* 数据库可视化面板 */}
       {showDatabase && (
         <PanelErrorBoundary onError={() => setShowDatabase(false)}>
           <DatabasePanel onClose={() => setShowDatabase(false)} />
         </PanelErrorBoundary>
       )}
 
-      {/* 底部 Agent 状态栏 */}
       {sceneReady && <AgentStatusBar />}
-
-      {/* 右侧聊天面板 */}
       {sceneReady && <ChatBox />}
     </>
   );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../shared/i18n';
 
 export interface ContactItem {
   slug: string;       // 'group' for group chat, agent slug for direct
@@ -22,7 +23,7 @@ export const ChatContactList: React.FC<ChatContactListProps> = ({
 }) => {
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Agent列表</div>
+      <div style={styles.header}>{t('agent.list')}</div>
       <div style={styles.list}>
         {contacts.map((c) => {
           const isActive = c.slug === activeContact;

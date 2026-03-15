@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { EventBus } from '../shared/events/EventBus';
 import { loadAgentRegistry, getAgentsCached, type AgentRegistryEntry } from '../shared/agentRegistry';
 import { ChatContactList, type ContactItem } from './ChatContactList';
+import { t } from '../shared/i18n';
 
 // Agent 列表辅助函数（从 agentRegistry 动态加载）
 function toAgentDef(e: AgentRegistryEntry) {
@@ -44,8 +45,8 @@ function nextMsgId(): string {
 
 function makeWelcomeMsg(contactName?: string): ChatMessage {
   const content = contactName
-    ? `你现在和${contactName}直接对话，消息不经过调度员。`
-    : '欢迎来到 AgentsOffice！\n直接输入需求，调度员会自动分配合适的 Agent。';
+    ? t('chat.privateLabel', { agent: contactName })
+    : t('chat.welcome');
   return { id: 'sys-welcome', role: 'system', content, timestamp: new Date() };
 }
 
@@ -346,9 +347,9 @@ export const ChatBox: React.FC = () => {
     const list: ContactItem[] = [
       {
         slug: GROUP_CONTACT_SLUG,
-        name: '全员群聊',
+        name: t('agent.groupChat'),
         color: '#ffd700',
-        role: '调度员自动分配',
+        role: t('agent.groupChatDesc'),
         lastMessage: lastMessages[GROUP_CONTACT_SLUG],
       },
     ];
@@ -578,7 +579,7 @@ export const ChatBox: React.FC = () => {
           case 'error':
             addMessage({
               role: 'system',
-              content: event.data.content || '调度员暂时无法响应',
+              content: event.data.content || t('chat.dispatcherUnavailable'),
             });
             break;
 
@@ -646,7 +647,7 @@ export const ChatBox: React.FC = () => {
             setActiveSkillSession(null);
             addMessage({
               role: 'system',
-              content: `技能执行错误: ${event.data.error || '未知错误'}`,
+              content: t('chat.skillError', { error: event.data.error || 'unknown' }),
             });
             break;
         }
@@ -894,7 +895,7 @@ export const ChatBox: React.FC = () => {
   );
 
   const activeContactDef = activeContact === GROUP_CONTACT_SLUG
-    ? { name: '全员群聊', color: '#ffd700' }
+    ? { name: t('agent.groupChat'), color: '#ffd700' }
     : agents.find((a) => a.slug === activeContact) || { name: activeContact, color: '#888' };
 
   const getAgentColor = (slug?: string) =>
@@ -960,7 +961,7 @@ export const ChatBox: React.FC = () => {
                 {activeContactDef.name}
               </span>
               {activeContact !== GROUP_CONTACT_SLUG && (
-                <span style={{ color: '#666', fontSize: 11, marginLeft: 4 }}>私聊</span>
+                <span style={{ color: '#666', fontSize: 11, marginLeft: 4 }}>{t('agent.privateChat')}</span>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1123,7 +1124,7 @@ export const ChatBox: React.FC = () => {
                     {msg.messageType === 'skill_awaiting_user' && activeSkillSession && (
                       <div style={skillStyles.actionBar}>
                         <span style={{ color: '#aaa', fontSize: 12 }}>
-                          已选 {selectedProducts.length}/4 个商品
+                          {t('chat.selected', { count: String(selectedProducts.length), max: '4' })}
                         </span>
                         <button
                           onClick={handleSkillRespond}
@@ -1133,7 +1134,7 @@ export const ChatBox: React.FC = () => {
                             opacity: selectedProducts.length < 2 || skillResponding ? 0.4 : 1,
                           }}
                         >
-                          {skillResponding ? '分析中...' : `对比 (${selectedProducts.length})`}
+                          {skillResponding ? t('chat.analyzing') : t('chat.compare', { count: String(selectedProducts.length) })}
                         </button>
                       </div>
                     )}
@@ -1245,8 +1246,8 @@ export const ChatBox: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder={
                 activeContact === GROUP_CONTACT_SLUG
-                  ? '输入需求，调度员自动分配'
-                  : `和${activeContactDef.name}说点什么...`
+                  ? t('chat.inputPlaceholder')
+                  : t('chat.inputPrivate', { agent: activeContactDef.name })
               }
               disabled={sending}
               style={{
@@ -1262,7 +1263,7 @@ export const ChatBox: React.FC = () => {
                 opacity: sending ? 0.5 : 1,
               }}
             >
-              {sending ? '…' : '发送'}
+              {sending ? '…' : t('chat.send')}
             </button>
           </div>
         </div>
