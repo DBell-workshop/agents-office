@@ -289,7 +289,15 @@ async def chat_stream(payload: ChatRequest):
             if not dispatcher_model and not settings.default_llm_model:
                 if not settings.has_any_llm_key:
                     yield f"event: init\ndata: {json.dumps({'conversation_id': conversation_id})}\n\n"
-                    yield f"event: error\ndata: {json.dumps({'role': 'system', 'agent_slug': 'system', 'agent_name': '系统', 'content': '⚙️ 尚未配置 AI 模型。请先完成以下步骤：\\n\\n1. 在项目根目录创建 .env 文件（可复制 .env.example）\\n2. 填入至少一个 LLM API Key（如 GEMINI_API_KEY、OPENAI_API_KEY 等）\\n3. 重启后端服务\\n\\n或者点击底部 Agent 状态栏 → 点击调度员 → 在配置面板中设置模型。'}, ensure_ascii=False)}\n\n"
+                    no_model_msg = (
+                        "⚙️ 尚未配置 AI 模型。请先完成以下步骤：\n\n"
+                        "1. 在项目根目录创建 .env 文件（可复制 .env.example）\n"
+                        "2. 填入至少一个 LLM API Key（如 GEMINI_API_KEY、OPENAI_API_KEY 等）\n"
+                        "3. 重启后端服务\n\n"
+                        "或者点击底部 Agent 状态栏 → 点击调度员 → 在配置面板中设置模型。"
+                    )
+                    error_data = json.dumps({"role": "system", "agent_slug": "system", "agent_name": "系统", "content": no_model_msg}, ensure_ascii=False)
+                    yield f"event: error\ndata: {error_data}\n\n"
                     return
 
             # 先推送 conversation_id
@@ -381,7 +389,13 @@ async def chat_direct_stream(payload: DirectChatRequest):
                 if not settings.has_any_llm_key:
                     agent_name = agent_defn.get("display_name", payload.agent_slug)
                     yield f"event: init\ndata: {json.dumps({'conversation_id': conversation_id})}\n\n"
-                    yield f"event: error\ndata: {json.dumps({'content': f'⚙️ {agent_name} 还没有配置 AI 模型，无法对话。\\n\\n请点击底部状态栏中的 {agent_name} → 打开配置面板 → 选择模型并填入 API Key。\\n\\n或者在 .env 文件中配置 DEFAULT_LLM_MODEL 和对应的 API Key。'}, ensure_ascii=False)}\n\n"
+                    no_model_msg = (
+                        f"⚙️ {agent_name} 还没有配置 AI 模型，无法对话。\n\n"
+                        f"请点击底部状态栏中的 {agent_name} → 打开配置面板 → 选择模型并填入 API Key。\n\n"
+                        "或者在 .env 文件中配置 DEFAULT_LLM_MODEL 和对应的 API Key。"
+                    )
+                    error_data = json.dumps({"content": no_model_msg}, ensure_ascii=False)
+                    yield f"event: error\ndata: {error_data}\n\n"
                     return
 
             if payload.conversation_id is None and office_store is not None:
