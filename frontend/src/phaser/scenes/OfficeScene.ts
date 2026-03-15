@@ -267,9 +267,18 @@ export class OfficeScene extends Phaser.Scene {
 
     this.input.mouse?.disableContextMenu();
 
-    // 6. 监听聊天事件驱动 Agent 移动 & 对话气泡
+    // 6. 监听聊天事件驱动 Agent 移动 & 对话气泡 & 状态
     EventBus.on('chat:agent-move', this.onChatAgentMove, this);
     EventBus.on('chat:agent-bubble', this.onAgentBubble, this);
+    EventBus.on('agent:status', this.onAgentStatusChange, this);
+
+    // 7. 空闲 Agent 随机走动
+    this.time.addEvent({
+      delay: 5000,
+      loop: true,
+      callback: this.idleWander,
+      callbackScope: this,
+    });
 
     EventBus.emit('scene:ready');
   }
@@ -662,9 +671,140 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
+  // ============================================================
+  // Agent 状态动画
+  // ============================================================
+  private onAgentStatusChange(data: { agentSlug: string; status: string }) {
+    const agent = this.agents.find((a) => a.slug === data.agentSlug);
+    if (!agent) return;
+
+    if (data.status === 'working' || data.status === 'running') {
+      this.startWorkingAnimation(agent);
+    } else {
+      this.stopWorkingAnimation(agent);
+    }
+  }
+
+  private startWorkingAnimation(agent: AgentCharacter) {
+    // 面朝上（朝电脑方向）播放 idle 动画
+    agent.sprite.play(`${agent.spriteKey}-idle-up`);
+
+    // 添加打字粒子效果（小方块从头顶飘出）
+    if ((agent as any)._typingTimer) return; // 已经在工作了
+
+    const typingEmitter = () => {
+      if (agent.isMoving) return;
+      const colors = [0xffd700, 0x4ade80, 0x60a5fa, 0xf97316];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const offsetX = (Math.random() - 0.5) * 20;
+
+      const dot = this.add.rectangle(
+        agent.container.x + offsetX,
+        agent.container.y - 50,
+        4, 4, color, 0.9,
+      );
+      dot.setDepth(agent.container.y + 1000);
+
+      this.tweens.add({
+        targets: dot,
+        y: dot.y - 20 - Math.random() * 15,
+        alpha: 0,
+        duration: 600 + Math.random() * 400,
+        ease: 'Quad.easeOut',
+        onComplete: () => dot.destroy(),
+      });
+    };
+
+    // 立即发射一次，然后每400ms发射
+    typingEmitter();
+    (agent as any)._typingTimer = this.time.addEvent({
+      delay: 400,
+      loop: true,
+      callback: typingEmitter,
+    });
+
+    // Agent 轻微上下晃动（模拟敲键盘）
+    if (!(agent as any)._bounceTween) {
+      (agent as any)._bounceTween = this.tweens.add({
+        targets: agent.sprite,
+        y: -2,
+        duration: 300,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+  }
+
+  private stopWorkingAnimation(agent: AgentCharacter) {
+    // 停止打字粒子
+    if ((agent as any)._typingTimer) {
+      (agent as any)._typingTimer.destroy();
+      (agent as any)._typingTimer = undefined;
+    }
+
+    // 停止晃动
+    if ((agent as any)._bounceTween) {
+      (agent as any)._bounceTween.stop();
+      (agent as any)._bounceTween = undefined;
+      agent.sprite.y = 0;
+    }
+
+    // 恢复正面 idle 动画
+    if (!agent.isMoving) {
+      agent.sprite.play(`${agent.spriteKey}-idle-down`);
+    }
+  }
+
+  // ============================================================
+  // 空闲 Agent 随机走动
+  // ============================================================
+  private idleWander() {
+    this.agents.forEach((agent) => {
+      // 正在移动或工作中的 Agent 不走动
+      if (agent.isMoving) return;
+      if ((agent as any)._typingTimer) return;
+
+      // 30% 概率触发走动
+      if (Math.random() > 0.3) return;
+
+      const room = ROOMS[agent.currentRoom];
+      if (!room) return;
+
+      // 在当前房间内随机选一个站位
+      const randomSpot = room.spots[Math.floor(Math.random() * room.spots.length)];
+      const dx = randomSpot.x - agent.container.x;
+      const dy = randomSpot.y - agent.container.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // 太近就不走了
+      if (distance < 30) return;
+
+      const dir = this.getDirection(dx, dy);
+      agent.sprite.play(`${agent.spriteKey}-walk-${dir}`);
+      agent.isMoving = true;
+
+      this.tweens.add({
+        targets: agent.container,
+        x: randomSpot.x,
+        y: randomSpot.y,
+        duration: (distance / 60) * 1000, // 60px/s 慢速闲逛
+        ease: 'Linear',
+        onUpdate: () => {
+          agent.container.setDepth(agent.container.y);
+        },
+        onComplete: () => {
+          agent.isMoving = false;
+          agent.sprite.play(`${agent.spriteKey}-idle-down`);
+        },
+      });
+    });
+  }
+
   shutdown() {
     EventBus.off('chat:agent-move', this.onChatAgentMove, this);
     EventBus.off('chat:agent-bubble', this.onAgentBubble, this);
+    EventBus.off('agent:status', this.onAgentStatusChange, this);
   }
 
   update(_time: number, _delta: number) {
