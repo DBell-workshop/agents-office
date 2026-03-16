@@ -23,6 +23,7 @@ frontend/dist/
 
 # Test screenshots
 *.png
+!docs/images/*.png
 output/
 
 # 密钥文件 — 绝对不能提交
