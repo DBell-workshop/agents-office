@@ -63,7 +63,7 @@ interface AgentClickData {
   agentColor: string;
 }
 
-const MAX_AGENTS = 20;
+const MAX_AGENTS = 99;
 
 export const ReactOverlay: React.FC = () => {
   const [sceneReady, setSceneReady] = useState(false);

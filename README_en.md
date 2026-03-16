@@ -103,7 +103,7 @@ Define roles, write prompts, equip skills -- spin up your own AI workforce in 5 
 Built on the Phaser 3 game engine -- a 2D pixel office where every agent has their own desk, room, and animations. Click an agent to start a conversation.
 
 ### 🤖 Flexible Agent System
-- **Free tier**: 2 custom agents + 1 dispatcher
+- **Unlimited agents**: Create as many agents as you need to build your dream team
 - **Configurable via UI**: Name, prompt, model, skills -- no code changes needed
 - **20 pre-made pixel characters** to choose from, giving each agent a unique look
 
