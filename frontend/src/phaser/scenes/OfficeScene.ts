@@ -279,11 +279,25 @@ export class OfficeScene extends Phaser.Scene {
     this.agentSpawns = buildAgentSpawns();
     this.buildCorridorGraph();
 
-    // 1. 地图
+    // 1. 地图 — 用 sprites 渲染 Ground 层（而非 TileLayer），确保 depth 排序完全可控
     this.map = this.make.tilemap({ key: 'office-map' });
     const floorTS = this.map.addTilesetImage('FloorAndGround', 'tiles_wall')!;
-    const groundLayer = this.map.createLayer('Ground', floorTS);
-    if (groundLayer) groundLayer.setDepth(-1000);
+    // 逐瓦片渲染 Ground，每个 tile 作为独立 sprite，depth 固定 -1000
+    const groundData = this.map.getLayer('Ground');
+    if (groundData) {
+      const tw = this.map.tileWidth;
+      const th = this.map.tileHeight;
+      for (let row = 0; row < groundData.height; row++) {
+        for (let col = 0; col < groundData.width; col++) {
+          const tile = groundData.data[row][col];
+          if (tile.index < 0) continue; // 空瓦片
+          const frame = tile.index - floorTS.firstgid;
+          if (frame < 0) continue;
+          const s = this.add.sprite(col * tw + tw / 2, row * th + th / 2, 'tiles_wall', frame);
+          s.setDepth(-1000);
+        }
+      }
+    }
 
     // 2. Object layers — 全部使用固定低 depth，确保 Agent 永远在最上层
     this.addGroupFromTiled('Wall', 'tiles_wall', 'FloorAndGround', -500);
