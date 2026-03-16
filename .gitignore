@@ -21,8 +21,9 @@ frontend/dist/
 # Playwright MCP
 .playwright-mcp/
 
-# Test screenshots
-*.png
+# Test screenshots (keep game assets)
+*.screenshot.png
+comparison-result-screenshot.png
 output/
 
 # 密钥文件 — 绝对不能提交

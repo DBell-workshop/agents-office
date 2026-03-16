@@ -19,10 +19,10 @@ from app.services.agents.runner import record_cost, run_agent, run_agent_stream
 from app.services.agents.tools import (
     DATA_ANALYST_TOOLS,
     DATA_ENGINEER_TOOLS,
-    DESIGNER_TOOLS,
-    PRODUCT_TOOLS,
     get_tools_by_key,
 )
+PRODUCT_TOOLS = []   # placeholder for generic version
+DESIGNER_TOOLS = []  # placeholder for generic version
 from app.services.agents.tool_executors import execute_tool
 
 __all__ = [

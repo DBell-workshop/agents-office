@@ -4,22 +4,30 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from app.services.product_search import (
-    compare_products,
-    get_category_stats,
-    get_product_detail,
-    search_products,
-)
-from app.services.data_engineer import (
-    clean_data,
-    create_table_from_file,
-    execute_sql,
-    list_uploaded_files,
-    list_user_tables,
-    parse_file,
-    query_data,
-    test_db_connection,
-)
+try:
+    from app.services.product_search import (
+        compare_products,
+        get_category_stats,
+        get_product_detail,
+        search_products,
+    )
+except ImportError:
+    compare_products = get_category_stats = get_product_detail = search_products = None
+
+try:
+    from app.services.data_engineer import (
+        clean_data,
+        create_table_from_file,
+        execute_sql,
+        list_uploaded_files,
+        list_user_tables,
+        parse_file,
+        query_data,
+        test_db_connection,
+    )
+except ImportError:
+    clean_data = create_table_from_file = execute_sql = None
+    list_uploaded_files = list_user_tables = parse_file = query_data = test_db_connection = None
 
 log = logging.getLogger(__name__)
 
