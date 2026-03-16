@@ -17,7 +17,7 @@ interface Template {
 
 const ROOMS = [
   { id: 'workspace', label: '待命区' },
-  { id: 'showroom', label: '商品展厅' },
+  { id: 'showroom', label: '展示厅' },
   { id: 'datacenter', label: '数据仓库' },
   { id: 'meeting', label: '协作室' },
 ];

@@ -721,11 +721,14 @@ def get_skill_registry() -> ApiEnvelope:
 
 @router.get("/agent-templates")
 def get_agent_templates() -> ApiEnvelope:
-    """返回所有预设 Agent 模板，供用户创建新 Agent 时选择。"""
+    """返回所有预设 Agent 模板（含场景模板中的角色），供用户创建新 Agent 时选择。"""
     from app.services.agents import BUILTIN_AGENTS
+    from app.services.agents.definitions import SCENARIO_TEMPLATES
 
     trace_id = make_id("trc")
     templates = []
+
+    # 内置 Agent 作为模板
     for slug, defn in BUILTIN_AGENTS.items():
         templates.append({
             "slug": slug,
@@ -734,18 +737,22 @@ def get_agent_templates() -> ApiEnvelope:
             "color": defn.get("color", "#cccccc"),
             "room_id": defn.get("room_id", "workspace"),
             "system_prompt": defn.get("system_prompt", ""),
-            "tools": defn.get("tools", ""),
         })
-    # 也加入调度员作为模板
-    templates.insert(0, {
-        "slug": "dispatcher",
-        "display_name": "调度员",
-        "role": "任务调度，理解用户需求并分配给合适的 Agent",
-        "color": "#ff6b6b",
-        "room_id": "manager",
-        "system_prompt": "",
-        "tools": "",
-    })
+
+    # 场景模板中的额外角色（不在内置列表中的）
+    for _scenario_key, scenario in SCENARIO_TEMPLATES.items():
+        agent_defs = scenario.get("agent_definitions", {})
+        for slug, defn in agent_defs.items():
+            if slug not in BUILTIN_AGENTS:
+                templates.append({
+                    "slug": slug,
+                    "display_name": defn.get("display_name", slug),
+                    "role": defn.get("role", ""),
+                    "color": defn.get("color", "#cccccc"),
+                    "room_id": defn.get("room_id", "workspace"),
+                    "system_prompt": "",
+                })
+
     return _envelope(trace_id=trace_id, data={"templates": templates})
 
 
