@@ -5,6 +5,10 @@
   <a href="README_ja.md">日本語</a>
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" width="800" alt="AgentsOffice Demo" />
+</p>
+
 <h1 align="center">AgentsOffice</h1>
 
 <p align="center">
@@ -260,6 +264,22 @@ AgentsOffice is a community-driven open source project. If you find it useful, p
 
 ---
 
+## Community
+
+Join the community to share ideas, ask questions, and show off your agent setups:
+
+<p align="center">
+  <a href="https://discord.gg/agentsoffice"><img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/DBell-workshop/agents-office/discussions"><img src="https://img.shields.io/badge/GitHub-Discussions-181717?logo=github" alt="Discussions" /></a>
+</p>
+
+<p align="center">
+  <strong>WeChat Group</strong> (scan to join; after 7-day expiry, get the latest QR in Discussions)<br/>
+  <img src="docs/wechat-qr.jpg" width="200" alt="WeChat Group QR" />
+</p>
+
+---
+
 ## Contributing
 
 Contributions are welcome!
@@ -267,6 +287,7 @@ Contributions are welcome!
 - Open an Issue to report bugs or suggest features
 - Submit a PR to contribute code
 - Build custom skills and share them with the community
+- Chat with us on [Discussions](https://github.com/DBell-workshop/agents-office/discussions)
 
 ---
 
