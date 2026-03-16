@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" width="800" alt="AgentsOffice - 繁體中文" />
+  <img src="docs/screenshot-9agents.png" width="800" alt="AgentsOffice - 繁體中文" />
 </p>
 
 <h1 align="center">AgentsOffice</h1>
