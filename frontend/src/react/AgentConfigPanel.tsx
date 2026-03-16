@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
+import { invalidateAgentCache, loadAgentRegistry } from '../shared/agentRegistry';
 
 interface ModelOption {
   model_name: string;
@@ -33,12 +34,13 @@ interface Props {
   agentSlug: string;
   agentName: string;
   agentColor: string;
+  isBuiltin: boolean;
   onClose: () => void;
 }
 
 type Tab = 'identity' | 'model' | 'prompt';
 
-export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentColor, onClose }) => {
+export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentColor, isBuiltin, onClose }) => {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus>({});
   const [config, setConfig] = useState<AgentConfig>({
@@ -60,6 +62,9 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
   const [refineMsg, setRefineMsg] = useState('');
   const [templates, setTemplates] = useState<Array<{slug: string; display_name: string; role: string; color: string; system_prompt: string}>>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // 加载预设模板
   useEffect(() => {
@@ -169,6 +174,29 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
     } finally {
       setRefining(false);
       setTimeout(() => setRefineMsg(''), 4000);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`/api/v1/office/agent-config/${agentSlug}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setDeleteError(body?.detail || '删除失败');
+        setDeleting(false);
+        return;
+      }
+      // 刷新缓存 + 通知其他组件
+      invalidateAgentCache();
+      const entries = await loadAgentRegistry();
+      EventBus.emit('agent:despawned', { slug: agentSlug });
+      EventBus.emit('agent:registry-changed', { count: entries.length });
+      onClose();
+    } catch {
+      setDeleteError('网络错误');
+      setDeleting(false);
     }
   };
 
@@ -397,6 +425,40 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
                 </div>
               </div>
             )}
+
+            {/* 危险操作区 */}
+            {!isBuiltin && (
+              <div style={{
+                marginTop: 16,
+                paddingTop: 12,
+                borderTop: '1px solid #33281a',
+              }}>
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'rgba(255, 107, 107, 0.05)',
+                  border: '1px solid rgba(255, 107, 107, 0.2)',
+                  borderRadius: 6,
+                }}>
+                  <div style={{ fontSize: 12, color: '#ff6b6b', marginBottom: 8 }}>
+                    危险操作
+                  </div>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    style={styles.deleteBtn}
+                  >
+                    删除此 Agent
+                  </button>
+                  <div style={{ ...styles.hint, marginTop: 6 }}>
+                    删除后该 Agent 将从办公室移除，此操作不可撤销
+                  </div>
+                </div>
+              </div>
+            )}
+            {isBuiltin && !config.active && (
+              <div style={{ ...styles.hint, marginTop: 12, color: '#887766' }}>
+                内置 Agent 无法删除，可通过上方的「激活状态」来停用
+              </div>
+            )}
           </>
         )}
 
@@ -584,6 +646,84 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
           )}
         </div>
       </div>
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 300,
+          }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            style={{
+              width: 380,
+              background: 'rgba(15, 12, 8, 0.97)',
+              border: '2px solid #ff6b6b',
+              borderRadius: 6,
+              padding: '20px 24px',
+              fontFamily: 'monospace',
+              color: '#e0e0e0',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 'bold', color: '#ff6b6b', marginBottom: 14 }}>
+              [!] 确认删除 Agent
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{
+                width: 12, height: 12, borderRadius: '50%',
+                background: displayColor, border: `2px solid ${displayColor}`,
+              }} />
+              <span style={{ color: displayColor, fontWeight: 'bold' }}>
+                {config.display_name || agentName}
+              </span>
+              <span style={{ color: '#887766', fontSize: 12 }}>({agentSlug})</span>
+            </div>
+
+            <div style={{ fontSize: 12, color: '#ccbb88', lineHeight: 1.6, marginBottom: 16 }}>
+              <div>- 该 Agent 的配置、提示词、模型设置将永久删除</div>
+              <div>- 该 Agent 将从办公室场景中移除</div>
+              <div>- 历史对话记录中该 Agent 的消息将保留</div>
+              <div style={{ color: '#ff6b6b', fontWeight: 'bold', marginTop: 6 }}>此操作不可撤销</div>
+            </div>
+
+            {deleteError && (
+              <div style={{ color: '#ff6b6b', fontSize: 12, marginBottom: 10 }}>{deleteError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  background: 'none', border: '1px solid #665544', borderRadius: 4,
+                  color: '#998877', padding: '8px 16px', cursor: 'pointer',
+                  fontFamily: 'monospace', fontSize: 13,
+                }}
+                autoFocus
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  background: 'rgba(255, 107, 107, 0.2)', border: '1px solid #ff6b6b',
+                  borderRadius: 4, color: '#ff6b6b', padding: '8px 16px',
+                  cursor: 'pointer', fontFamily: 'monospace', fontSize: 13, fontWeight: 'bold',
+                  opacity: deleting ? 0.5 : 1,
+                }}
+              >
+                {deleting ? '删除中...' : `删除 ${config.display_name || agentName}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -737,6 +877,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'monospace',
     fontSize: '12px',
     fontWeight: 'bold',
+  },
+  deleteBtn: {
+    background: 'rgba(255, 107, 107, 0.15)',
+    border: '1px solid #ff6b6b',
+    borderRadius: 4,
+    color: '#ff6b6b',
+    padding: '6px 14px',
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    fontSize: '12px',
   },
   dbBtn: {
     background: 'rgba(167, 139, 250, 0.2)',

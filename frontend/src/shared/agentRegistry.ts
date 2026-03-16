@@ -13,6 +13,7 @@ export interface AgentRegistryEntry {
   roomId: string;        // Phaser room id
   phaserAgentId: string; // Phaser sprite id
   isDispatcher: boolean;
+  isBuiltin: boolean;
 }
 
 /** sprite 映射：slug → 精灵 key。后端不管前端素材，由前端维护。 */
@@ -46,13 +47,13 @@ let loadPromise: Promise<AgentRegistryEntry[]> | null = null;
 
 /** 硬编码 fallback — 与后端 BUILTIN_AGENTS + DISPATCHER 一致 */
 const FALLBACK_AGENTS: AgentRegistryEntry[] = [
-  { slug: 'dispatcher', displayName: '调度员', role: '任务分配与调度', color: '#ff6b6b', roomId: 'manager', phaserAgentId: 'agt_dispatcher', isDispatcher: true },
-  { slug: 'shopping_guide', displayName: '导购员', role: '商品推荐与咨询', color: '#4ade80', roomId: 'showroom', phaserAgentId: 'agt_guide', isDispatcher: false },
-  { slug: 'product_specialist', displayName: '理货员', role: '商品数据与库存', color: '#60a5fa', roomId: 'datacenter', phaserAgentId: 'agt_inventory', isDispatcher: false },
-  { slug: 'data_engineer', displayName: '数据工程师', role: '数据管理与上传', color: '#a78bfa', roomId: 'datacenter', phaserAgentId: 'agt_data_eng', isDispatcher: false },
-  { slug: 'data_analyst', displayName: '数据分析师', role: '数据分析与洞察', color: '#f59e0b', roomId: 'datacenter', phaserAgentId: 'agt_data_analyst', isDispatcher: false },
-  { slug: 'price_comparator', displayName: '比价专员', role: '跨平台商品比价', color: '#f97316', roomId: 'workspace', phaserAgentId: 'agt_price_cmp', isDispatcher: false },
-  { slug: 'graphic_designer', displayName: '平面设计师', role: '视觉设计与图片生成', color: '#ec4899', roomId: 'workspace', phaserAgentId: 'agt_designer', isDispatcher: false },
+  { slug: 'dispatcher', displayName: '调度员', role: '任务分配与调度', color: '#ff6b6b', roomId: 'manager', phaserAgentId: 'agt_dispatcher', isDispatcher: true, isBuiltin: true },
+  { slug: 'shopping_guide', displayName: '导购员', role: '商品推荐与咨询', color: '#4ade80', roomId: 'showroom', phaserAgentId: 'agt_guide', isDispatcher: false, isBuiltin: true },
+  { slug: 'product_specialist', displayName: '理货员', role: '商品数据与库存', color: '#60a5fa', roomId: 'datacenter', phaserAgentId: 'agt_inventory', isDispatcher: false, isBuiltin: true },
+  { slug: 'data_engineer', displayName: '数据工程师', role: '数据管理与上传', color: '#a78bfa', roomId: 'datacenter', phaserAgentId: 'agt_data_eng', isDispatcher: false, isBuiltin: true },
+  { slug: 'data_analyst', displayName: '数据分析师', role: '数据分析与洞察', color: '#f59e0b', roomId: 'datacenter', phaserAgentId: 'agt_data_analyst', isDispatcher: false, isBuiltin: true },
+  { slug: 'price_comparator', displayName: '比价专员', role: '跨平台商品比价', color: '#f97316', roomId: 'workspace', phaserAgentId: 'agt_price_cmp', isDispatcher: false, isBuiltin: true },
+  { slug: 'graphic_designer', displayName: '平面设计师', role: '视觉设计与图片生成', color: '#ec4899', roomId: 'workspace', phaserAgentId: 'agt_designer', isDispatcher: false, isBuiltin: true },
 ];
 
 /**
@@ -76,6 +77,7 @@ export function loadAgentRegistry(): Promise<AgentRegistryEntry[]> {
         roomId: a.room_id || 'workspace',
         phaserAgentId: a.phaser_agent_id || '',
         isDispatcher: a.is_dispatcher || false,
+        isBuiltin: a.is_builtin ?? true,
       }));
       return cachedAgents;
     })

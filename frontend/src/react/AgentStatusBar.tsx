@@ -28,6 +28,7 @@ interface AgentDef {
   modelDisplay: string;
   active: boolean;
   hasPrompt: boolean;
+  isBuiltin: boolean;
 }
 
 type AgentStatus = 'idle' | 'working' | 'standby';
@@ -62,6 +63,7 @@ export const AgentStatusBar: React.FC = () => {
       modelDisplay: 'Gemini Flash',
       active: true,
       hasPrompt: true,
+      isBuiltin: a.isBuiltin,
     }))
   );
 
@@ -77,6 +79,7 @@ export const AgentStatusBar: React.FC = () => {
           modelDisplay: 'Gemini Flash',
           active: true,
           hasPrompt: true,
+          isBuiltin: a.isBuiltin,
         }));
         return fromRegistry.map((r) => {
           const existing = prev.find((p) => p.slug === r.slug);
@@ -154,18 +157,47 @@ export const AgentStatusBar: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  // 注册表变更 → 重新加载 Agent 列表
+  const reloadFromRegistry = useCallback(() => {
+    loadAgentRegistry().then((entries) => {
+      setAgents(entries.map((a) => ({
+        slug: a.slug,
+        name: a.displayName,
+        color: a.color,
+        role: a.role,
+        modelDisplay: 'Gemini Flash',
+        active: true,
+        hasPrompt: true,
+        isBuiltin: a.isBuiltin,
+      })));
+      // 同步新 Agent 的状态
+      setStatuses((prev) => {
+        const updated = { ...prev };
+        for (const a of entries) {
+          if (!(a.slug in updated)) {
+            updated[a.slug] = 'idle';
+          }
+        }
+        return updated;
+      });
+    });
+    syncAgentDefinitions();
+  }, [syncAgentDefinitions]);
+
   useEffect(() => {
     syncAgentDefinitions();
     syncTokensFromAPI();
 
     EventBus.on('chat:round-complete', syncTokensFromAPI);
     EventBus.on('agent:config-updated', syncAgentDefinitions);
+    EventBus.on('agent:registry-changed', reloadFromRegistry);
 
     return () => {
       EventBus.off('chat:round-complete', syncTokensFromAPI);
       EventBus.off('agent:config-updated', syncAgentDefinitions);
+      EventBus.off('agent:registry-changed', reloadFromRegistry);
     };
-  }, [syncAgentDefinitions, syncTokensFromAPI]);
+  }, [syncAgentDefinitions, syncTokensFromAPI, reloadFromRegistry]);
 
   useEffect(() => {
     const onStatusChange = (data: { agentSlug: string; status: AgentStatus }) => {
@@ -200,6 +232,7 @@ export const AgentStatusBar: React.FC = () => {
       agentSlug: agent.slug,
       agentName: agent.name,
       agentColor: agent.color,
+      isBuiltin: agent.isBuiltin,
     });
   };
 

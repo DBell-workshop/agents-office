@@ -270,6 +270,12 @@ export class OfficeScene extends Phaser.Scene {
     EventBus.on('chat:agent-move', this.onChatAgentMove, this);
     EventBus.on('chat:agent-bubble', this.onAgentBubble, this);
 
+    // 7. 监听新 Agent 创建事件，动态添加精灵
+    EventBus.on('agent:spawned', this.onAgentSpawned, this);
+
+    // 8. 监听 Agent 删除事件，移除精灵
+    EventBus.on('agent:despawned', this.onAgentDespawned, this);
+
     EventBus.emit('scene:ready');
   }
 
@@ -282,6 +288,92 @@ export class OfficeScene extends Phaser.Scene {
 
   private onAgentBubble(data: { agentSlug: string; text: string; duration?: number }) {
     this.showAgentBubble(data.agentSlug, data.text, data.duration);
+  }
+
+  private onAgentSpawned(data: {
+    slug: string;
+    displayName: string;
+    color: string;
+    roomId: string;
+    phaserAgentId: string;
+  }) {
+    // 避免重复添加
+    if (this.agents.find((a) => a.slug === data.slug)) return;
+
+    const spriteKey = getSpriteKey(data.slug);
+    const agentId = data.phaserAgentId || `agt_${data.slug}`;
+    const homeRoom = data.roomId || 'workspace';
+    const color = cssColorToHex(data.color);
+
+    // 创建动画
+    const dirs: { dir: Direction; colStart: number }[] = [
+      { dir: 'down', colStart: 0 },
+      { dir: 'right', colStart: 6 },
+      { dir: 'up', colStart: 12 },
+      { dir: 'left', colStart: 18 },
+    ];
+    dirs.forEach(({ dir, colStart }) => {
+      const idleKey = `${spriteKey}-idle-${dir}`;
+      if (!this.anims.exists(idleKey)) {
+        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+        for (let i = 0; i < 6; i++) {
+          frames.push({ key: spriteKey, frame: 1 * SPRITE_COLS + colStart + i });
+        }
+        this.anims.create({ key: idleKey, frames, frameRate: 6, repeat: -1 });
+      }
+      const walkKey = `${spriteKey}-walk-${dir}`;
+      if (!this.anims.exists(walkKey)) {
+        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+        for (let i = 0; i < 6; i++) {
+          frames.push({ key: spriteKey, frame: 2 * SPRITE_COLS + colStart + i });
+        }
+        this.anims.create({ key: walkKey, frames, frameRate: 10, repeat: -1 });
+      }
+    });
+
+    // 在目标房间分配站位
+    const room = ROOMS[homeRoom] || ROOMS.workspace;
+    const usedCount = this.agents.filter((a) => a.currentRoom === homeRoom).length;
+    const spotIndex = usedCount % room.spots.length;
+    const pos = room.spots[spotIndex];
+
+    // 创建精灵
+    const sprite = this.add.sprite(0, 0, spriteKey);
+    sprite.play(`${spriteKey}-idle-down`);
+
+    const nameTag = this.add.text(0, -42, data.displayName, {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+      shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true },
+    });
+    nameTag.setOrigin(0.5);
+
+    const container = this.add.container(pos.x, pos.y, [sprite, nameTag]);
+    container.setDepth(pos.y);
+    container.setSize(32, 64);
+    container.setInteractive({ useHandCursor: true });
+
+    container.on('pointerdown', () => {
+      EventBus.emit('agent:clicked', { agentId, name: data.displayName });
+    });
+    container.on('pointerover', () => sprite.setTint(0xffd700));
+    container.on('pointerout', () => sprite.clearTint());
+
+    this.agents.push({
+      container,
+      sprite,
+      nameTag,
+      agentId,
+      slug: data.slug,
+      spriteKey,
+      color,
+      isMoving: false,
+      homeRoom,
+      currentRoom: homeRoom,
+    });
   }
 
   // ============================================================
@@ -301,6 +393,18 @@ export class OfficeScene extends Phaser.Scene {
       label.setAlpha(0.85);
       label.setDepth(10000);
     }
+  }
+
+  private onAgentDespawned(data: { slug: string }) {
+    const idx = this.agents.findIndex((a) => a.slug === data.slug);
+    if (idx === -1) return;
+    const agent = this.agents[idx];
+    // 清除气泡
+    if (agent.bubbleTimer) { agent.bubbleTimer.destroy(); }
+    if (agent.bubbleContainer) { agent.bubbleContainer.destroy(); }
+    // 销毁容器（包含 sprite + nameTag）
+    agent.container.destroy();
+    this.agents.splice(idx, 1);
   }
 
   // ============================================================
@@ -660,6 +764,8 @@ export class OfficeScene extends Phaser.Scene {
   shutdown() {
     EventBus.off('chat:agent-move', this.onChatAgentMove, this);
     EventBus.off('chat:agent-bubble', this.onAgentBubble, this);
+    EventBus.off('agent:spawned', this.onAgentSpawned, this);
+    EventBus.off('agent:despawned', this.onAgentDespawned, this);
   }
 
   update(_time: number, _delta: number) {

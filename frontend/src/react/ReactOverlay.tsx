@@ -2,6 +2,7 @@ import React, { Component, useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
 import { getAgentsCached, loadAgentRegistry } from '../shared/agentRegistry';
 import { AgentConfigPanel } from './AgentConfigPanel';
+import { AgentCreateDialog } from './AgentCreateDialog';
 import { AgentStatusBar } from './AgentStatusBar';
 import { ChatBox } from './ChatBox';
 // import { CollectorPanel } from './CollectorPanel';  // 采集功能暂停，改为接口导入模式
@@ -61,6 +62,7 @@ interface AgentClickData {
   agentSlug: string;
   agentName: string;
   agentColor: string;
+  isBuiltin: boolean;
 }
 
 const MAX_AGENTS = 20;
@@ -70,6 +72,7 @@ export const ReactOverlay: React.FC = () => {
   const [configAgent, setConfigAgent] = useState<AgentClickData | null>(null);
   const [showDatabase, setShowDatabase] = useState(false);
   const [showCollector, setShowCollector] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [agentCount, setAgentCount] = useState(6);
 
   // 初始化 agent 计数
@@ -88,7 +91,7 @@ export const ReactOverlay: React.FC = () => {
       const agents = getAgentsCached();
       const agent = agents.find((a) => a.phaserAgentId === data.agentId);
       if (agent) {
-        setConfigAgent({ agentSlug: agent.slug, agentName: agent.displayName, agentColor: agent.color });
+        setConfigAgent({ agentSlug: agent.slug, agentName: agent.displayName, agentColor: agent.color, isBuiltin: agent.isBuiltin });
       }
     };
 
@@ -101,19 +104,28 @@ export const ReactOverlay: React.FC = () => {
       setShowDatabase(true);
     };
 
-    // 采集面板事件已暂停
-    // const onOpenCollector = () => { setConfigAgent(null); setShowCollector(true); };
+    // ➕ 按钮 → 打开创建对话框
+    const onAddNew = () => setShowCreateDialog(true);
+
+    // Agent 注册表变更 → 更新计数
+    const onRegistryChanged = (data: { count: number }) => {
+      setAgentCount(data.count);
+    };
 
     EventBus.on('scene:ready', onSceneReady);
     EventBus.on('agent:clicked', onAgentClicked);
     EventBus.on('agent:open-config', onConfigOpen);
     EventBus.on('database:open', onOpenDatabase);
+    EventBus.on('agent:add-new', onAddNew);
+    EventBus.on('agent:registry-changed', onRegistryChanged);
 
     return () => {
       EventBus.off('scene:ready', onSceneReady);
       EventBus.off('agent:clicked', onAgentClicked);
       EventBus.off('agent:open-config', onConfigOpen);
       EventBus.off('database:open', onOpenDatabase);
+      EventBus.off('agent:add-new', onAddNew);
+      EventBus.off('agent:registry-changed', onRegistryChanged);
     };
   }, []);
 
@@ -124,6 +136,7 @@ export const ReactOverlay: React.FC = () => {
         setConfigAgent(null);
         setShowDatabase(false);
         setShowCollector(false);
+        setShowCreateDialog(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -155,7 +168,7 @@ export const ReactOverlay: React.FC = () => {
           <span>Agents: {agentCount}/{MAX_AGENTS}</span>
           {agentCount < MAX_AGENTS && (
             <button
-              onClick={() => EventBus.emit('agent:add-new', {})}
+              onClick={() => setShowCreateDialog(true)}
               title="添加新 Agent"
               style={{
                 background: '#4ade80',
@@ -180,12 +193,25 @@ export const ReactOverlay: React.FC = () => {
         </div>
       )}
 
+      {/* Agent 创建对话框 */}
+      {showCreateDialog && (
+        <AgentCreateDialog
+          onClose={() => setShowCreateDialog(false)}
+          onCreated={(slug, name, color) => {
+            setShowCreateDialog(false);
+            // 创建成功后打开配置面板，方便用户继续设置提示词和模型
+            setConfigAgent({ agentSlug: slug, agentName: name, agentColor: color, isBuiltin: false });
+          }}
+        />
+      )}
+
       {/* Agent 配置面板 */}
       {configAgent && (
         <AgentConfigPanel
           agentSlug={configAgent.agentSlug}
           agentName={configAgent.agentName}
           agentColor={configAgent.agentColor}
+          isBuiltin={configAgent.isBuiltin}
           onClose={() => setConfigAgent(null)}
         />
       )}

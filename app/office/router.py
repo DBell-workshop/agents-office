@@ -760,10 +760,12 @@ def get_agent_registry() -> ApiEnvelope:
     合并 BUILTIN_AGENTS + DB 自定义配置，返回前端渲染所需的全部字段。
     前端 ChatBox、OfficeScene、AgentStatusBar 均从此接口加载 Agent 列表。
     """
-    from app.services.agents import get_full_registry
+    from app.services.agents import BUILTIN_AGENTS, DISPATCHER_DEFINITION, get_full_registry
 
     trace_id = make_id("trc")
     registry = get_full_registry()
+
+    builtin_slugs = set(BUILTIN_AGENTS.keys()) | {"dispatcher"}
 
     agents = []
     for slug, defn in registry.items():
@@ -775,6 +777,7 @@ def get_agent_registry() -> ApiEnvelope:
             "room_id": defn.get("room_id", "workspace"),
             "phaser_agent_id": defn.get("phaser_agent_id", ""),
             "is_dispatcher": defn.get("is_dispatcher", False),
+            "is_builtin": slug in builtin_slugs,
         })
     return _envelope(trace_id=trace_id, data={"agents": agents})
 
@@ -796,6 +799,7 @@ class AgentConfigPayload(BaseModel):
     system_prompt: Optional[str] = None
     color: Optional[str] = None
     active: Optional[bool] = None
+    room_id: Optional[str] = None
 
 
 @router.get("/agent-config")
@@ -862,8 +866,29 @@ def update_agent_config(slug: str, payload: AgentConfigPayload) -> ApiEnvelope:
         config["color"] = payload.color
     if payload.active is not None:
         config["active"] = payload.active
+    if payload.room_id is not None:
+        config["room_id"] = payload.room_id
     agent = store.update_agent_config_by_slug(slug, config)
     return _envelope(trace_id=trace_id, data=agent)
+
+
+@router.delete("/agent-config/{slug}")
+def delete_agent_config(slug: str) -> ApiEnvelope:
+    """删除指定 Agent。内置 Agent 不允许删除。"""
+    from app.services.agents import BUILTIN_AGENTS
+
+    trace_id = make_id("trc")
+    builtin_slugs = set(BUILTIN_AGENTS.keys()) | {"dispatcher"}
+    if slug in builtin_slugs:
+        raise HTTPException(
+            status_code=403,
+            detail="内置 Agent 不支持删除，可通过停用操作禁用该 Agent",
+        )
+    store = _require_store()
+    deleted = store.delete_agent_by_slug(slug)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="agent not found")
+    return _envelope(trace_id=trace_id, data={"slug": slug, "deleted": True})
 
 
 # ================================================================

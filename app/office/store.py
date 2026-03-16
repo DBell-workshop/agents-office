@@ -272,7 +272,7 @@ class OfficeStore:
 
         # 分离模型配置和身份配置
         model_fields = {"model_name", "temperature", "max_tokens", "api_base", "api_key"}
-        identity_fields = {"display_name", "role", "system_prompt", "color", "active"}
+        identity_fields = {"display_name", "role", "system_prompt", "color", "active", "room_id"}
 
         model_cfg = {k: v for k, v in config.items() if k in model_fields}
         identity_cfg = {k: v for k, v in config.items() if k in identity_fields}
@@ -309,6 +309,16 @@ class OfficeStore:
                         row.description = identity_cfg["role"]
             session.commit()
             return self._agent_row_to_dict(row)
+
+    def delete_agent_by_slug(self, slug: str) -> bool:
+        """按 slug 删除 Agent。返回是否成功删除。"""
+        with self.SessionFactory() as session:
+            row = session.query(AgentRow).filter(AgentRow.slug == slug).first()
+            if row is None:
+                return False
+            session.delete(row)
+            session.commit()
+            return True
 
     def get_active_agent_definitions(self) -> List[Dict[str, Any]]:
         """获取所有活跃 Agent 的定义，供调度员动态构建路由使用。"""
