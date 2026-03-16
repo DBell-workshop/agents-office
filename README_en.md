@@ -269,7 +269,6 @@ AgentsOffice is a community-driven open source project. If you find it useful, p
 Join the community to share ideas, ask questions, and show off your agent setups:
 
 <p align="center">
-  <a href="https://discord.gg/agentsoffice"><img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="https://github.com/DBell-workshop/agents-office/discussions"><img src="https://img.shields.io/badge/GitHub-Discussions-181717?logo=github" alt="Discussions" /></a>
 </p>
 
