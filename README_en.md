@@ -136,53 +136,37 @@ Built on the Phaser 3 game engine -- a 2D pixel office where every agent has the
 <a id="quick-start"></a>
 ## Quick Start
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
+### One-Click Launch (Recommended)
 
-### 1. Clone the repo
+Just install [Docker](https://www.docker.com/products/docker-desktop/), then:
 
 ```bash
 git clone https://github.com/DBell-workshop/agents-office.git
 cd agents-office
-```
-
-### 2. Configure environment variables
-
-```bash
-cp .env.example .env
-# Edit .env and add your LLM API key
-```
-
-### 3. Start the database
-
-```bash
+cp .env.example .env   # Edit .env, add at least one LLM API Key
 docker compose up -d
 ```
 
-### 4. Start the backend
+Open **http://localhost:8001/static/office/** and you're good to go.
+
+### Development Mode
+
+If you want to modify code (with hot reload):
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Database
+docker compose up postgres -d
+
+# Backend
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
+
+# Frontend (separate terminal)
+cd frontend && npm install && npm run dev
 ```
 
-### 5. Start the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 6. Open your browser
-
-Visit **http://localhost:5173/static/office/**
-
-You'll see the pixel-art office. Click the agent status bar at the bottom to get started!
+Dev mode: visit **http://localhost:5174/static/office/**
 
 ---
 

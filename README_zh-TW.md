@@ -136,53 +136,37 @@ AgentsOffice 是一個**多 Agent 協作工作台**，用像素風 RPG 辦公室
 <a id="quick-start"></a>
 ## Quick Start
 
-### 環境需求
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
+### 一鍵啟動（推薦）
 
-### 1. 複製專案
+只需要安裝 [Docker](https://www.docker.com/products/docker-desktop/)，然後：
 
 ```bash
 git clone https://github.com/DBell-workshop/agents-office.git
 cd agents-office
-```
-
-### 2. 設定環境變數
-
-```bash
-cp .env.example .env
-# 編輯 .env，填入你的 LLM API Key
-```
-
-### 3. 啟動資料庫
-
-```bash
+cp .env.example .env   # 編輯 .env，至少填入一個 LLM API Key
 docker compose up -d
 ```
 
-### 4. 啟動後端
+打開 **http://localhost:8001/static/office/** 即可使用。
+
+### 開發模式
+
+如果你想修改程式碼（支援熱更新）：
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# 資料庫
+docker compose up postgres -d
+
+# 後端
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
+
+# 前端（另一個終端）
+cd frontend && npm install && npm run dev
 ```
 
-### 5. 啟動前端
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 6. 開啟瀏覽器
-
-前往 **http://localhost:5173/static/office/**
-
-你會看到像素風辦公室，點擊底部 Agent 狀態列開始體驗！
+開發模式訪問 **http://localhost:5174/static/office/**
 
 ---
 

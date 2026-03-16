@@ -233,8 +233,6 @@ const FIXED_SPAWN_POINTS: { x: number; y: number; room: string }[] = [
   { x: 250, y: 660, room: 'meeting' },       // 20. 协作室左侧
 ];
 
-const ROOM_KEYS = Object.keys(ROOMS);
-
 function buildAgentSpawns() {
   return getAgentsCached().map((a, idx) => {
     const spawn = FIXED_SPAWN_POINTS[idx % FIXED_SPAWN_POINTS.length];
@@ -299,17 +297,18 @@ export class OfficeScene extends Phaser.Scene {
       }
     }
 
-    // 2. Object layers — 全部使用固定低 depth，确保 Agent 永远在最上层
-    this.addGroupFromTiled('Wall', 'tiles_wall', 'FloorAndGround', -500);
-    this.addGroupFromTiled('Objects', 'office', 'Modern_Office_Black_Shadow', 1);
-    this.addGroupFromTiled('ObjectsOnCollide', 'office', 'Modern_Office_Black_Shadow', 1);
-    this.addGroupFromTiled('GenericObjects', 'generic', 'Generic', 1);
-    this.addGroupFromTiled('GenericObjectsOnCollide', 'generic', 'Generic', 1);
-    this.addGroupFromTiled('Basement', 'basement', 'Basement', -800);
-    this.addGroupFromTiled('Chair', 'chairs', 'chair', 2);
-    this.addGroupFromTiled('Computer', 'computers', 'computer', 2);
-    this.addGroupFromTiled('Whiteboard', 'whiteboards', 'whiteboard', 2);
-    this.addGroupFromTiled('VendingMachine', 'vendingmachines', 'vendingmachine', 2);
+    // 2. Object layers — 全部固定 depth=-999，仅比 Ground(-1000) 高一点
+    //    Agent 在 depth 10000+，绝对不会被遮挡
+    this.addGroupFromTiled('Basement', 'basement', 'Basement', -999);
+    this.addGroupFromTiled('Wall', 'tiles_wall', 'FloorAndGround', -998);
+    this.addGroupFromTiled('Objects', 'office', 'Modern_Office_Black_Shadow', -997);
+    this.addGroupFromTiled('ObjectsOnCollide', 'office', 'Modern_Office_Black_Shadow', -996);
+    this.addGroupFromTiled('GenericObjects', 'generic', 'Generic', -995);
+    this.addGroupFromTiled('GenericObjectsOnCollide', 'generic', 'Generic', -994);
+    this.addGroupFromTiled('Chair', 'chairs', 'chair', -993);
+    this.addGroupFromTiled('Computer', 'computers', 'computer', -992);
+    this.addGroupFromTiled('Whiteboard', 'whiteboards', 'whiteboard', -991);
+    this.addGroupFromTiled('VendingMachine', 'vendingmachines', 'vendingmachine', -990);
 
     // 3. 房间名称标签
     this.createRoomLabels();
@@ -1128,7 +1127,7 @@ export class OfficeScene extends Phaser.Scene {
         if (dist < 30) occupied.add(i);
       }
     }
-    const free = spots.map((s, i) => i).filter(i => !occupied.has(i));
+    const free = spots.map((_, i) => i).filter(i => !occupied.has(i));
     const idx = free.length > 0
       ? free[Math.floor(Math.random() * free.length)]
       : Math.floor(Math.random() * spots.length);

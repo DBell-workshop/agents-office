@@ -18,6 +18,26 @@ services:
       timeout: 3s
       retries: 5
 
+  app:
+    build: .
+    container_name: agents_office_app
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 数据库（容器内部通过服务名连接）
+      DATABASE_URL_SYNC: postgresql://agents_dev:agents_dev_pass@postgres:5432/agents_office
+      # LLM API Keys（从 .env 文件读取）
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-}
+
 volumes:
   pgdata:
     driver: local

@@ -69,7 +69,6 @@ export const ReactOverlay: React.FC = () => {
   const [sceneReady, setSceneReady] = useState(false);
   const [configAgent, setConfigAgent] = useState<AgentClickData | null>(null);
   const [showDatabase, setShowDatabase] = useState(false);
-  const [showCollector, setShowCollector] = useState(false);
   const [agentCount, setAgentCount] = useState(6);
 
   useEffect(() => {
@@ -115,7 +114,6 @@ export const ReactOverlay: React.FC = () => {
       if (e.key === 'Escape') {
         setConfigAgent(null);
         setShowDatabase(false);
-        setShowCollector(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
