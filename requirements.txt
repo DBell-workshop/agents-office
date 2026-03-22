@@ -9,3 +9,4 @@ pyyaml>=6.0,<7.0
 patchright>=1.40
 playwright-stealth>=1.0
 litellm>=1.0
+python-multipart>=0.0.6

@@ -87,32 +87,50 @@ AgentsOffice 是一个 **通用 AI 数字员工平台**。你可以自由定义 
 <a id="quick-start"></a>
 ## Quick Start
 
-### 环境要求
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose（用于 PostgreSQL）
+### 一键启动（推荐）
 
-### 1. 克隆项目
+只需安装 [Docker](https://www.docker.com/)，然后：
 
 ```bash
-git clone https://github.com/DBell-workshop/ecommerce-ai-lab.git
-cd ecommerce-ai-lab
-```
-
-### 2. 启动数据库
-
-```bash
+git clone https://github.com/DBell-workshop/agents-office.git
+cd agents-office
+cp .env.example .env    # 编辑 .env，至少填入一个 LLM API Key
 docker compose up -d
 ```
 
-### 3. 配置 API Key
+打开 **http://localhost:8001/static/office/** 即可使用。
+
+### 手动启动（开发者）
+
+<details>
+<summary>展开查看手动部署步骤</summary>
+
+#### 环境要求
+- Python 3.11+
+- Node.js 18+（仅前端开发需要）
+- PostgreSQL 14+
+
+#### 1. 克隆项目
+
+```bash
+git clone https://github.com/DBell-workshop/agents-office.git
+cd agents-office
+```
+
+#### 2. 启动数据库
+
+```bash
+docker compose up postgres -d
+```
+
+#### 3. 配置环境变量
 
 ```bash
 cp .env.example .env
 # 编辑 .env，至少填入一个 LLM API Key
 ```
 
-### 4. 启动后端
+#### 4. 启动后端
 
 ```bash
 python3 -m venv .venv
@@ -121,13 +139,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
-### 5. 打开浏览器
+#### 5. 打开浏览器
 
 访问 **http://localhost:8001/static/office/**
 
-你会看到像素风办公室和预设的自媒体工作室团队。点击底部 Agent 卡片可以配置，点击右侧聊天框开始对话！
+</details>
 
-> 💡 **开发模式**（支持热更新）：`cd frontend && npm install && npm run dev`，访问 http://localhost:5173/static/office/
+> 💡 **前端开发模式**（支持热更新）：`cd frontend && npm install && npm run dev`，访问 http://localhost:5173/static/office/
 
 ---
 

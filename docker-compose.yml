@@ -1,9 +1,7 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ecom_ai_db
+    container_name: agents_office_db
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -19,6 +17,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  app:
+    build: .
+    container_name: agents_office_app
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      # 容器内部通过服务名连接 PostgreSQL，覆盖 .env 中的 localhost
+      DATABASE_URL_SYNC: postgresql://ecom_dev:ecom_dev_pass@postgres:5432/ecom_ai_lab
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:

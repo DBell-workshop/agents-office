@@ -258,7 +258,63 @@ INSERT INTO model_pricing (model_name, display_name, provider, input_price_per_1
 ON CONFLICT (model_name) DO NOTHING;
 
 -- ============================================================
--- 13. 修改 tasks 表：增加 agent_id 和 agent_slug 列
+-- 13. 会话表（AgentsOffice Chat History）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id TEXT PRIMARY KEY,
+    title           TEXT NOT NULL DEFAULT '',
+    status          TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active', 'archived', 'deleted')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE conversations IS '聊天会话记录';
+
+-- ============================================================
+-- 14. 聊天消息表（AgentsOffice Chat History）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS chat_messages (
+    message_id      BIGSERIAL PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    role            TEXT NOT NULL,
+    agent_slug      TEXT,
+    agent_name      TEXT,
+    content         TEXT NOT NULL DEFAULT '',
+    message_type    TEXT,
+    metadata        JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_msg_conv ON chat_messages (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_msg_created ON chat_messages (created_at);
+
+COMMENT ON TABLE chat_messages IS '聊天消息记录，关联到 conversations 表';
+
+-- ============================================================
+-- 15. 数据大屏表（AgentsOffice Dashboard）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS dashboards (
+    dashboard_id    TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    slug            TEXT NOT NULL UNIQUE,
+    description     TEXT,
+    template_key    TEXT,
+    layout          JSONB NOT NULL DEFAULT '[]',
+    charts          JSONB NOT NULL DEFAULT '[]',
+    data_sources    JSONB NOT NULL DEFAULT '[]',
+    refresh_config  JSONB NOT NULL DEFAULT '{}',
+    status          TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft', 'active', 'archived')),
+    created_by      TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE dashboards IS '数据大屏配置';
+
+-- ============================================================
+-- 16. 修改 tasks 表：增加 agent_id 和 agent_slug 列
 -- ============================================================
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS agent_id TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS agent_slug TEXT;
