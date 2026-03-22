@@ -136,6 +136,7 @@ export const AgentCreateDialog: React.FC<Props> = ({ onClose, onCreated }) => {
       onCreated(trimmedSlug, trimmedName, color);
     } catch {
       setError('网络错误');
+    } finally {
       setCreating(false);
     }
   };

@@ -330,7 +330,7 @@ export const ChatBox: React.FC = () => {
       .then((envelope) => {
         setConversations(envelope?.data?.conversations || []);
       })
-      .catch(() => {});
+      .catch((err) => console.error('[ChatBox] 加载会话列表失败:', err));
   }, []);
 
   useEffect(() => {
@@ -434,8 +434,8 @@ export const ChatBox: React.FC = () => {
       });
 
       setMessages(loaded.length > 0 ? loaded : [makeWelcomeMsg()]);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[ChatBox] 切换历史会话失败:', err);
     } finally {
       setLoadingHistory(false);
     }

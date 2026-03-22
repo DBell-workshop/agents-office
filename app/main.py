@@ -31,7 +31,7 @@ app.include_router(office_router, prefix="/api/v1/office", tags=["AgentsOffice"]
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 
 def envelope(trace_id: str, data: dict, error: Optional[str] = None) -> ApiEnvelope:

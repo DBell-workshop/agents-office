@@ -1,4 +1,4 @@
-import React, { Component, useEffect, useState } from 'react';
+import React, { Component, lazy, Suspense, useEffect, useState } from 'react';
 import { EventBus } from '../shared/events/EventBus';
 import { getAgentsCached, loadAgentRegistry } from '../shared/agentRegistry';
 import { AgentConfigPanel } from './AgentConfigPanel';
@@ -7,6 +7,9 @@ import { AgentStatusBar } from './AgentStatusBar';
 import { ChatBox } from './ChatBox';
 // import { CollectorPanel } from './CollectorPanel';  // 采集功能暂停，改为接口导入模式
 import { DatabasePanel } from './DatabasePanel';
+
+import { ScenarioTemplatePanel } from './ScenarioTemplatePanel';
+const DashboardView = lazy(() => import('./DashboardView'));
 
 // 错误边界：防止子面板崩溃导致整个 UI 消失
 class PanelErrorBoundary extends Component<
@@ -71,8 +74,12 @@ export const ReactOverlay: React.FC = () => {
   const [sceneReady, setSceneReady] = useState(false);
   const [configAgent, setConfigAgent] = useState<AgentClickData | null>(null);
   const [showDatabase, setShowDatabase] = useState(false);
-  const [showCollector, setShowCollector] = useState(false);
+
+  const [_showCollector, setShowCollector] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dashboardId, setDashboardId] = useState<string | undefined>(undefined);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [agentCount, setAgentCount] = useState(6);
 
   // 初始化 agent 计数
@@ -107,6 +114,12 @@ export const ReactOverlay: React.FC = () => {
     // ➕ 按钮 → 打开创建对话框
     const onAddNew = () => setShowCreateDialog(true);
 
+    // 打开数据大屏
+    const onOpenDashboard = (data?: { dashboardId?: string }) => {
+      setDashboardId(data?.dashboardId);
+      setShowDashboard(true);
+    };
+
     // Agent 注册表变更 → 更新计数
     const onRegistryChanged = (data: { count: number }) => {
       setAgentCount(data.count);
@@ -118,6 +131,7 @@ export const ReactOverlay: React.FC = () => {
     EventBus.on('database:open', onOpenDatabase);
     EventBus.on('agent:add-new', onAddNew);
     EventBus.on('agent:registry-changed', onRegistryChanged);
+    EventBus.on('dashboard:open', onOpenDashboard);
 
     return () => {
       EventBus.off('scene:ready', onSceneReady);
@@ -126,6 +140,7 @@ export const ReactOverlay: React.FC = () => {
       EventBus.off('database:open', onOpenDatabase);
       EventBus.off('agent:add-new', onAddNew);
       EventBus.off('agent:registry-changed', onRegistryChanged);
+      EventBus.off('dashboard:open', onOpenDashboard);
     };
   }, []);
 
@@ -137,6 +152,8 @@ export const ReactOverlay: React.FC = () => {
         setShowDatabase(false);
         setShowCollector(false);
         setShowCreateDialog(false);
+        setShowDashboard(false);
+        setShowTemplates(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -166,6 +183,56 @@ export const ReactOverlay: React.FC = () => {
           <span>AgentsOffice v0.1</span>
           <span style={{ color: '#88cc99' }}>|</span>
           <span>Agents: {agentCount}/{MAX_AGENTS}</span>
+          <span style={{ color: '#88cc99' }}>|</span>
+          <button
+            onClick={() => setShowTemplates(true)}
+            title="场景模板"
+            style={{
+              background: 'none',
+              color: '#ffd666',
+              border: '1px solid #ffd666',
+              borderRadius: 3,
+              padding: '1px 8px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+            }}
+          >
+            📋 模板
+          </button>
+          <button
+            onClick={() => window.open('/static/office/dashboard.html', '_blank', 'noopener')}
+            title="数据大屏"
+            style={{
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(99,102,241,0.2))',
+              color: '#c4b5fd',
+              border: '1px solid rgba(139,92,246,0.5)',
+              borderRadius: 6,
+              padding: '3px 12px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontWeight: 600,
+              letterSpacing: 1,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.4))';
+              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.8)';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 2px 12px rgba(139,92,246,0.3)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(99,102,241,0.2))';
+              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)';
+              e.currentTarget.style.color = '#c4b5fd';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            📊 大屏
+          </button>
           {agentCount < MAX_AGENTS && (
             <button
               onClick={() => setShowCreateDialog(true)}
@@ -228,6 +295,29 @@ export const ReactOverlay: React.FC = () => {
       {showDatabase && (
         <PanelErrorBoundary onError={() => setShowDatabase(false)}>
           <DatabasePanel onClose={() => setShowDatabase(false)} />
+        </PanelErrorBoundary>
+      )}
+
+      {/* 场景模板 */}
+      {showTemplates && (
+        <ScenarioTemplatePanel
+          onClose={() => setShowTemplates(false)}
+          onApplied={() => {
+            // 刷新 Agent 注册表
+            loadAgentRegistry().then((entries) => setAgentCount(entries.length));
+          }}
+        />
+      )}
+
+      {/* 数据大屏 */}
+      {showDashboard && (
+        <PanelErrorBoundary onError={() => setShowDashboard(false)}>
+          <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'linear-gradient(-45deg, #f3e8ff, #e0f2fe, #f0fdf4, #ede9fe)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', fontSize: 15, fontFamily: 'Inter, sans-serif' }}>加载大屏组件...</div>}>
+            <DashboardView
+              dashboardId={dashboardId}
+              onClose={() => { setShowDashboard(false); setDashboardId(undefined); }}
+            />
+          </Suspense>
         </PanelErrorBoundary>
       )}
 
