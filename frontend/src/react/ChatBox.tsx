@@ -330,7 +330,10 @@ export const ChatBox: React.FC = () => {
       .then((envelope) => {
         setConversations(envelope?.data?.conversations || []);
       })
-      .catch((err) => console.error('[ChatBox] 加载会话列表失败:', err));
+      .catch((err) => {
+        console.error('[ChatBox] 加载会话列表失败:', err);
+        setMessages((prev) => [...prev, { id: nextMsgId(), role: 'system' as const, content: '加载历史会话失败，请刷新页面重试', timestamp: new Date() }]);
+      });
   }, []);
 
   useEffect(() => {
@@ -436,6 +439,7 @@ export const ChatBox: React.FC = () => {
       setMessages(loaded.length > 0 ? loaded : [makeWelcomeMsg()]);
     } catch (err) {
       console.error('[ChatBox] 切换历史会话失败:', err);
+      setMessages((prev) => [...prev, { id: nextMsgId(), role: 'system' as const, content: '切换会话失败，请重试', timestamp: new Date() }]);
     } finally {
       setLoadingHistory(false);
     }
