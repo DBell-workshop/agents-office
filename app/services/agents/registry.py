@@ -33,24 +33,21 @@ def load_agent_registry() -> Dict[str, Dict[str, Any]]:
 
                 if slug in registry:
                     # DB 配置覆盖内置默认（仅覆盖非空字段）
-                    if agent.get("system_prompt"):
-                        registry[slug]["system_prompt"] = agent["system_prompt"]
-                    if agent.get("display_name"):
-                        registry[slug]["display_name"] = agent["display_name"]
-                    if agent.get("role"):
-                        registry[slug]["role"] = agent["role"]
-                    if agent.get("color"):
-                        registry[slug]["color"] = agent["color"]
-                    if agent.get("room_id"):
-                        registry[slug]["room_id"] = agent["room_id"]
-                    if agent.get("phaser_agent_id"):
-                        registry[slug]["phaser_agent_id"] = agent["phaser_agent_id"]
-                    if agent.get("model_name"):
-                        registry[slug]["model_name"] = agent["model_name"]
+                    for field in ("system_prompt", "display_name", "role", "color",
+                                  "room_id", "phaser_agent_id", "model_name"):
+                        if agent.get(field):
+                            registry[slug][field] = agent[field]
+                    # 技能包：skill_packs 覆盖旧 tools 字段
+                    if agent.get("skill_packs"):
+                        registry[slug]["tools"] = agent["skill_packs"]
+                    elif agent.get("tools"):
+                        registry[slug]["tools"] = agent["tools"]
                 else:
                     # 用户自定义的全新 Agent
                     if not agent.get("system_prompt"):
                         continue  # 没有提示词的 agent 无法工作
+                    # 技能包：优先 skill_packs，回退 tools
+                    tools_val = agent.get("skill_packs") or agent.get("tools", "")
                     registry[slug] = {
                         "slug": slug,
                         "display_name": agent.get("display_name", slug),
@@ -60,6 +57,7 @@ def load_agent_registry() -> Dict[str, Dict[str, Any]]:
                         "room_id": agent.get("room_id", "workspace"),
                         "phaser_agent_id": agent.get("phaser_agent_id", ""),
                         "model_name": agent.get("model_name", ""),
+                        "tools": tools_val,
                     }
     except Exception as e:
         log.warning("从 DB 加载 Agent 定义失败，使用内置默认: %s", e)

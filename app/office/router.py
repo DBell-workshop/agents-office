@@ -1553,3 +1553,395 @@ def products_import_schema() -> ApiEnvelope:
 #     from app.services.collector.log_store import clear_logs
 #     count = clear_logs()
 #     return _envelope(trace_id=trace_id, data={"deleted": count})
+
+
+# ================================================================
+# Skill Packs API — 技能包
+# ================================================================
+
+@router.get("/skill-packs")
+def list_skill_packs() -> ApiEnvelope:
+    """列出所有可用的技能包。"""
+    trace_id = make_id("trc")
+    from app.services.agents.tools import get_skill_packs_catalog
+    return _envelope(trace_id=trace_id, data={"skill_packs": get_skill_packs_catalog()})
+
+
+class AgentSkillPacksUpdateRequest(BaseModel):
+    skill_packs: List[str]  # ["PRODUCT_TOOLS", "DASHBOARD_TOOLS"]
+
+
+@router.put("/agents/{agent_id}/skill-packs")
+def update_agent_skill_packs(agent_id: str, payload: AgentSkillPacksUpdateRequest) -> ApiEnvelope:
+    """更新 Agent 绑定的技能包列表。"""
+    trace_id = make_id("trc")
+    if office_store is None:
+        raise HTTPException(status_code=503, detail="数据库未初始化")
+
+    agent = office_store.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' 不存在")
+
+    # 验证所有 skill_packs key 都存在
+    from app.services.agents.tools import TOOLS_MAP
+    invalid = [k for k in payload.skill_packs if k not in TOOLS_MAP]
+    if invalid:
+        return _envelope(trace_id=trace_id, data={}, error=f"未知的技能包: {invalid}")
+
+    # 更新到 metadata.skill_packs
+    metadata = agent.get("metadata", {})
+    metadata["skill_packs"] = payload.skill_packs
+    office_store.update_agent(agent_id, {"metadata": metadata})
+
+    return _envelope(trace_id=trace_id, data={"agent_id": agent_id, "skill_packs": payload.skill_packs})
+
+
+@router.get("/agents/{agent_id}/skill-packs")
+def get_agent_skill_packs(agent_id: str) -> ApiEnvelope:
+    """获取 Agent 已绑定的技能包列表。"""
+    trace_id = make_id("trc")
+    if office_store is None:
+        raise HTTPException(status_code=503, detail="数据库未初始化")
+
+    agent = office_store.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' 不存在")
+
+    metadata = agent.get("metadata", {})
+    skill_packs = metadata.get("skill_packs", [])
+    # 兼容旧数据：如果没有 skill_packs 但有 tools 字段
+    if not skill_packs:
+        tools_key = metadata.get("tools", "")
+        if tools_key:
+            skill_packs = [tools_key] if isinstance(tools_key, str) else tools_key
+
+    return _envelope(trace_id=trace_id, data={"agent_id": agent_id, "skill_packs": skill_packs})
+
+
+# ================================================================
+# Scenario Templates API — 场景模板
+# ================================================================
+
+@router.get("/scenario-templates")
+def list_scenario_templates() -> ApiEnvelope:
+    """列出所有场景模板（内置 + 自定义）。"""
+    trace_id = make_id("trc")
+    from app.services.agents.definitions import SCENARIO_TEMPLATES
+    templates = []
+    for key, tpl in SCENARIO_TEMPLATES.items():
+        templates.append({
+            "key": key,
+            "name": tpl["name"],
+            "description": tpl["description"],
+            "agent_count": len(tpl["agents"]),
+            "agents": tpl["agents"],
+            "is_builtin": True,
+        })
+
+    # 加载自定义模板
+    if office_store is not None:
+        custom = _load_custom_templates()
+        templates.extend(custom)
+
+    return _envelope(trace_id=trace_id, data={"templates": templates})
+
+
+class ApplyTemplateRequest(BaseModel):
+    template_key: str
+    clear_existing: bool = False  # 是否清空现有 Agent
+
+
+@router.post("/scenario-templates/apply")
+async def apply_scenario_template(payload: ApplyTemplateRequest) -> ApiEnvelope:
+    """应用场景模板：批量创建模板中的所有 Agent。"""
+    trace_id = make_id("trc")
+    if office_store is None:
+        raise HTTPException(status_code=503, detail="数据库未初始化")
+
+    from app.services.agents.definitions import SCENARIO_TEMPLATES
+
+    # 先查内置模板
+    tpl = SCENARIO_TEMPLATES.get(payload.template_key)
+    if tpl is None:
+        # 查自定义模板
+        tpl = _get_custom_template(payload.template_key)
+    if tpl is None:
+        return _envelope(trace_id=trace_id, data={}, error=f"模板 '{payload.template_key}' 不存在")
+
+    # 可选：清空现有非调度员 Agent
+    if payload.clear_existing:
+        existing = office_store.list_agents()
+        for a in existing:
+            meta = a.get("metadata", {})
+            if not meta.get("is_dispatcher"):
+                try:
+                    office_store.update_agent(a["agent_id"], {"metadata": {**meta, "active": False}})
+                except Exception:
+                    pass
+
+    # 批量创建 Agent
+    created = []
+    agent_defs = tpl.get("agent_definitions", {})
+    for slug in tpl["agents"]:
+        defn = agent_defs.get(slug, {})
+        if not defn:
+            continue
+
+        # 检查是否已存在（按 slug 或 name 匹配）
+        existing = office_store.list_agents()
+        agent_name = defn.get("display_name", slug)
+        if any(a["slug"] == slug or a["name"] == agent_name for a in existing):
+            created.append({"slug": slug, "status": "already_exists"})
+            continue
+
+        try:
+            agent_id = make_id("agt")
+            agent_data = {
+                "name": defn.get("display_name", slug),
+                "slug": slug,
+                "description": defn.get("role", ""),
+                "agent_type": "general",
+                "model_config": {},
+                "metadata": {
+                    "display_name": defn.get("display_name", slug),
+                    "role": defn.get("role", ""),
+                    "color": defn.get("color", "#888"),
+                    "room_id": defn.get("room_id", "workspace"),
+                    "phaser_agent_id": defn.get("phaser_agent_id", f"agt_{slug}"),
+                    "system_prompt": defn.get("system_prompt", ""),
+                    "tools": defn.get("tools", ""),
+                    "skill_packs": [defn["tools"]] if defn.get("tools") else [],
+                    "active": True,
+                },
+            }
+            office_store.create_agent(agent_id, agent_data)
+            created.append({"slug": slug, "agent_id": agent_id, "status": "created"})
+        except Exception as e:
+            created.append({"slug": slug, "status": "error", "error": str(e)})
+
+    return _envelope(trace_id=trace_id, data={"template": payload.template_key, "agents": created})
+
+
+class SaveTemplateRequest(BaseModel):
+    name: str
+    description: str = ""
+
+
+@router.post("/scenario-templates/save-current")
+def save_current_as_template(payload: SaveTemplateRequest) -> ApiEnvelope:
+    """将当前所有 Agent 配置保存为自定义场景模板。"""
+    trace_id = make_id("trc")
+    if office_store is None:
+        raise HTTPException(status_code=503, detail="数据库未初始化")
+
+    agents = office_store.list_agents()
+    if not agents:
+        return _envelope(trace_id=trace_id, data={}, error="当前没有 Agent，无法保存模板")
+
+    template_key = f"custom_{make_id('tpl')}"
+    agent_slugs = []
+    agent_definitions = {}
+
+    for a in agents:
+        meta = a.get("metadata", {})
+        if meta.get("is_dispatcher"):
+            continue
+        slug = a["slug"]
+        agent_slugs.append(slug)
+        agent_definitions[slug] = {
+            "display_name": meta.get("display_name", a["name"]),
+            "role": meta.get("role", ""),
+            "color": meta.get("color", "#888"),
+            "room_id": meta.get("room_id", "workspace"),
+            "phaser_agent_id": meta.get("phaser_agent_id", ""),
+            "system_prompt": meta.get("system_prompt", ""),
+            "tools": meta.get("tools", ""),
+            "skill_packs": meta.get("skill_packs", []),
+        }
+
+    template_data = {
+        "key": template_key,
+        "name": payload.name,
+        "description": payload.description,
+        "agents": agent_slugs,
+        "agent_definitions": agent_definitions,
+        "is_builtin": False,
+    }
+
+    # 存到数据库 (使用 agent_events 表存储自定义模板，复用现有表)
+    from app.db.orm_models import AgentEventRow
+    with office_store.SessionFactory() as session:
+        row = AgentEventRow(
+            trace_id=trace_id,
+            agent_name="system",
+            event_type="scenario_template_saved",
+            payload=template_data,
+        )
+        session.add(row)
+        session.commit()
+
+    return _envelope(trace_id=trace_id, data=template_data)
+
+
+@router.delete("/scenario-templates/{template_key}")
+def delete_custom_template(template_key: str) -> ApiEnvelope:
+    """删除自定义场景模板。内置模板不可删除。"""
+    trace_id = make_id("trc")
+    from app.services.agents.definitions import SCENARIO_TEMPLATES
+    if template_key in SCENARIO_TEMPLATES:
+        return _envelope(trace_id=trace_id, data={}, error="内置模板不可删除")
+
+    if office_store is None:
+        raise HTTPException(status_code=503, detail="数据库未初始化")
+
+    from app.db.orm_models import AgentEventRow
+    with office_store.SessionFactory() as session:
+        rows = session.query(AgentEventRow).filter(
+            AgentEventRow.event_type == "scenario_template_saved",
+        ).all()
+        deleted = False
+        for row in rows:
+            if row.payload and row.payload.get("key") == template_key:
+                session.delete(row)
+                deleted = True
+        session.commit()
+
+    if not deleted:
+        return _envelope(trace_id=trace_id, data={}, error=f"模板 '{template_key}' 不存在")
+    return _envelope(trace_id=trace_id, data={"deleted": template_key})
+
+
+def _load_custom_templates() -> List[Dict[str, Any]]:
+    """从数据库加载自定义场景模板。"""
+    if office_store is None:
+        return []
+    from app.db.orm_models import AgentEventRow
+    with office_store.SessionFactory() as session:
+        rows = session.query(AgentEventRow).filter(
+            AgentEventRow.event_type == "scenario_template_saved",
+        ).order_by(AgentEventRow.created_at.desc()).all()
+        results = []
+        for r in rows:
+            if not r.payload:
+                continue
+            tpl = r.payload
+            tpl.setdefault("is_builtin", False)
+            tpl.setdefault("agent_count", len(tpl.get("agents", [])))
+            results.append(tpl)
+        return results
+
+
+def _get_custom_template(key: str) -> Optional[Dict[str, Any]]:
+    """获取单个自定义模板。"""
+    for tpl in _load_custom_templates():
+        if tpl.get("key") == key:
+            return tpl
+    return None
+
+
+# ================================================================
+# Dashboard API — 数据大屏
+# ================================================================
+
+class DashboardCreateRequest(BaseModel):
+    template_key: str
+    name: Optional[str] = None
+    aspect_ratio: Optional[str] = None  # "16:9", "21:9", "9:16", "4:3"
+
+
+class DashboardUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    charts: Optional[List[Dict[str, Any]]] = None
+    layout: Optional[Dict[str, Any]] = None
+    refresh_config: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+
+
+@router.get("/dashboards/templates")
+def dashboard_templates() -> ApiEnvelope:
+    """列出所有可用的大屏模板。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import list_templates
+    return _envelope(trace_id=trace_id, data={"templates": list_templates()})
+
+
+@router.get("/dashboards/templates/{template_key}")
+def dashboard_template_detail(template_key: str) -> ApiEnvelope:
+    """获取指定模板的完整配置（含所有图表定义）。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import get_template
+    tpl = get_template(template_key)
+    if tpl is None:
+        raise HTTPException(status_code=404, detail=f"模板 '{template_key}' 不存在")
+    return _envelope(trace_id=trace_id, data=tpl)
+
+
+@router.post("/dashboards")
+def create_dashboard(payload: DashboardCreateRequest) -> ApiEnvelope:
+    """基于模板创建一个新大屏。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import create_dashboard_from_template
+    result = create_dashboard_from_template(
+        template_key=payload.template_key,
+        name=payload.name,
+        aspect_ratio=payload.aspect_ratio,
+    )
+    if "error" in result:
+        return _envelope(trace_id=trace_id, data={}, error=result["error"])
+    result["access_url"] = f"/dashboard/{result['dashboard_id']}"
+    return _envelope(trace_id=trace_id, data=result)
+
+
+@router.get("/dashboards")
+def list_all_dashboards() -> ApiEnvelope:
+    """列出所有已创建的大屏。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import list_dashboards
+    dashboards = list_dashboards()
+    return _envelope(trace_id=trace_id, data={"dashboards": dashboards, "count": len(dashboards)})
+
+
+@router.get("/dashboards/{dashboard_id}")
+def get_dashboard_detail(dashboard_id: str) -> ApiEnvelope:
+    """获取单个大屏的完整配置。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import get_dashboard
+    dashboard = get_dashboard(dashboard_id)
+    if dashboard is None:
+        raise HTTPException(status_code=404, detail=f"大屏 '{dashboard_id}' 不存在")
+    return _envelope(trace_id=trace_id, data=dashboard)
+
+
+@router.put("/dashboards/{dashboard_id}")
+def update_dashboard_config(dashboard_id: str, payload: DashboardUpdateRequest) -> ApiEnvelope:
+    """更新大屏配置。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import update_dashboard
+    updates = payload.model_dump(exclude_none=True)
+    result = update_dashboard(dashboard_id, updates)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"大屏 '{dashboard_id}' 不存在")
+    return _envelope(trace_id=trace_id, data=result)
+
+
+@router.post("/dashboards/{dashboard_id}/refresh")
+def refresh_dashboard(dashboard_id: str) -> ApiEnvelope:
+    """手动刷新大屏数据。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import refresh_dashboard_data
+    result = refresh_dashboard_data(dashboard_id)
+    if "error" in result:
+        return _envelope(trace_id=trace_id, data={}, error=result["error"])
+    return _envelope(trace_id=trace_id, data=result)
+
+
+@router.delete("/dashboards/{dashboard_id}")
+def archive_dashboard(dashboard_id: str) -> ApiEnvelope:
+    """归档大屏（软删除）。"""
+    trace_id = make_id("trc")
+    from app.services.dashboard import update_dashboard
+    result = update_dashboard(dashboard_id, {"status": "archived"})
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"大屏 '{dashboard_id}' 不存在")
+    return _envelope(trace_id=trace_id, data={"archived": True, "dashboard_id": dashboard_id})

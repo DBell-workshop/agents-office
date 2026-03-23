@@ -250,6 +250,28 @@ class CostRecordRow(Base):
 
 # ---- 12. model_pricing (AgentsOffice) ----
 
+class DashboardRow(Base):
+    __tablename__ = "dashboards"
+
+    dashboard_id = Column(Text, primary_key=True)
+    name = Column(Text, nullable=False)
+    slug = Column(Text, nullable=False, unique=True)
+    description = Column(Text)
+    template_key = Column(Text)  # 来源模板 key（如 "618", "double11", "daily"）
+    layout = Column(JSONB, nullable=False, server_default="[]")  # 大屏布局配置
+    charts = Column(JSONB, nullable=False, server_default="[]")  # ECharts 图表配置列表
+    data_sources = Column(JSONB, nullable=False, server_default="[]")  # 数据源配置
+    refresh_config = Column(JSONB, nullable=False, server_default="{}")  # 刷新策略
+    status = Column(Text, nullable=False, default="draft")
+    created_by = Column(Text)  # agent_slug
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'active', 'archived')"),
+    )
+
+
 class ModelPricingRow(Base):
     __tablename__ = "model_pricing"
 

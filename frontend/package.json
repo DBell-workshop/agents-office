@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "easystarjs": "^0.4.4",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
     "phaser": "^3.90.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

@@ -1,0 +1,1 @@
+import{c as t,j as o,R as r}from"./client-UdtPHiHQ.js";import a from"./DashboardView-Bvr5XvUM.js";import"./phaser-DFK5Ua9d.js";const e=new URLSearchParams(window.location.search),s=e.get("id")||void 0,d=t.createRoot(document.getElementById("dashboard-root"));d.render(o.jsx(r.StrictMode,{children:o.jsx(a,{dashboardId:s})}));

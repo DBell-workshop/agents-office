@@ -38,7 +38,15 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'identity' | 'model' | 'prompt';
+type Tab = 'identity' | 'model' | 'prompt' | 'skills';
+
+interface SkillPack {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  tool_count: number;
+}
 
 export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentColor, isBuiltin, onClose }) => {
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -65,6 +73,9 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [skillPacks, setSkillPacks] = useState<SkillPack[]>([]);
+  const [agentSkillPacks, setAgentSkillPacks] = useState<string[]>([]);
+  const [savingSkills, setSavingSkills] = useState(false);
 
   // 加载预设模板
   useEffect(() => {
@@ -75,6 +86,28 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
       })
       .catch(() => {});
   }, []);
+
+  // 加载可用技能包列表 + 当前 Agent 的技能包
+  useEffect(() => {
+    fetch('/api/v1/office/skill-packs')
+      .then((r) => r.json())
+      .then((envelope) => setSkillPacks(envelope?.data?.skill_packs || []))
+      .catch(() => {});
+    // 从 agent-config 中读取 skill_packs（兼容方式）
+    fetch(`/api/v1/office/agent-config`)
+      .then((r) => r.json())
+      .then((envelope) => {
+        const configs = envelope?.data?.configs || {};
+        const agentCfg = configs[agentSlug];
+        if (agentCfg?.skill_packs) {
+          setAgentSkillPacks(agentCfg.skill_packs);
+        } else if (agentCfg?.tools) {
+          // 兼容旧格式
+          setAgentSkillPacks(typeof agentCfg.tools === 'string' ? [agentCfg.tools] : agentCfg.tools);
+        }
+      })
+      .catch(() => {});
+  }, [agentSlug]);
 
   // 加载可用模型列表
   useEffect(() => {
@@ -245,6 +278,7 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
             ['identity', '身份定义'],
             ['prompt', '系统提示词'],
             ['model', '模型配置'],
+            ['skills', '技能'],
           ] as [Tab, string][]).map(([tab, label]) => (
             <button
               key={tab}
@@ -578,6 +612,88 @@ export const AgentConfigPanel: React.FC<Props> = ({ agentSlug, agentName, agentC
                 </div>
               )}
             </div>
+          </>
+        )}
+
+        {/* === 技能配置 Tab === */}
+        {activeTab === 'skills' && (
+          <>
+            <div style={{ ...styles.hint, marginBottom: 12 }}>
+              为此 Agent 开启以下技能包。开启的技能越多，每次对话消耗的 token 越多。
+            </div>
+            {skillPacks.map((pack) => {
+              const checked = agentSkillPacks.includes(pack.key);
+              return (
+                <div
+                  key={pack.key}
+                  onClick={() => {
+                    setAgentSkillPacks((prev) =>
+                      checked ? prev.filter((k) => k !== pack.key) : [...prev, pack.key]
+                    );
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 12px',
+                    marginBottom: 6,
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: checked ? 'rgba(74, 222, 128, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1px solid ${checked ? '#4ade80' : '#333'}`,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{pack.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: checked ? '#4ade80' : '#e0e0e0', fontSize: 13, fontWeight: 600 }}>
+                      {pack.name}
+                    </div>
+                    <div style={{ color: '#887766', fontSize: 11, marginTop: 2 }}>
+                      {pack.description} · {pack.tool_count} 个工具
+                    </div>
+                  </div>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 3,
+                    border: `2px solid ${checked ? '#4ade80' : '#555'}`,
+                    background: checked ? '#4ade80' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, color: '#000', fontWeight: 'bold',
+                  }}>
+                    {checked ? '✓' : ''}
+                  </div>
+                </div>
+              );
+            })}
+            <button
+              onClick={async () => {
+                setSavingSkills(true);
+                try {
+                  // 找到 agent_id
+                  const listRes = await fetch('/api/v1/office/agents');
+                  const listJson = await listRes.json();
+                  const agents = listJson?.data?.agents || [];
+                  const agent = agents.find((a: { slug: string }) => a.slug === agentSlug);
+                  if (!agent) { setMessage('找不到 Agent'); return; }
+
+                  await fetch(`/api/v1/office/agents/${agent.agent_id}/skill-packs`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ skill_packs: agentSkillPacks }),
+                  });
+                  setMessage('技能包已保存');
+                  setTimeout(() => setMessage(''), 2000);
+                } catch {
+                  setMessage('保存失败');
+                } finally {
+                  setSavingSkills(false);
+                }
+              }}
+              disabled={savingSkills}
+              style={{ ...styles.saveBtn, marginTop: 12 }}
+            >
+              {savingSkills ? '保存中...' : '保存技能配置'}
+            </button>
           </>
         )}
 

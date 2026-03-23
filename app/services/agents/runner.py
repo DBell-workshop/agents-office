@@ -12,6 +12,24 @@ from app.services.agents.tool_executors import execute_tool
 
 log = logging.getLogger(__name__)
 
+_PROCESS_MESSAGES = {
+    "DATA_ENGINEER_TOOLS": "正在处理数据…",
+    "DATA_ANALYST_TOOLS": "正在分析数据…",
+    "DESIGNER_TOOLS": "正在设计中…",
+    "DASHBOARD_TOOLS": "正在配置数据大屏…",
+}
+
+
+def _get_process_message(agent_name: str, tools_key) -> str:
+    """根据 tools_key（字符串或列表）生成 process 消息。"""
+    if isinstance(tools_key, list):
+        # 多技能包：取第一个有匹配的
+        for k in tools_key:
+            if k in _PROCESS_MESSAGES:
+                return f"{agent_name}{_PROCESS_MESSAGES[k]}"
+        return f"{agent_name}正在工作中…"
+    return f"{agent_name}{_PROCESS_MESSAGES.get(tools_key, '前往数据仓库查询商品信息…')}"
+
 
 def record_cost(
     agent_slug: str,
@@ -109,14 +127,7 @@ async def run_agent(
 
         if not used_tools:
             used_tools = True
-            if tools_key == "DATA_ENGINEER_TOOLS":
-                process_msg = f"{agent_name}正在处理数据…"
-            elif tools_key == "DATA_ANALYST_TOOLS":
-                process_msg = f"{agent_name}正在分析数据…"
-            elif tools_key == "DESIGNER_TOOLS":
-                process_msg = f"{agent_name}正在设计中…"
-            else:
-                process_msg = f"{agent_name}前往数据仓库查询商品信息…"
+            process_msg = _get_process_message(agent_name, tools_key)
             process_messages.append({
                 "role": "process",
                 "agent_slug": agent_slug,
@@ -245,14 +256,7 @@ async def run_agent_stream(
         # 首次使用工具 → 推送 process 事件
         if not used_tools:
             used_tools = True
-            if tools_key == "DATA_ENGINEER_TOOLS":
-                process_msg = f"{agent_name}正在处理数据…"
-            elif tools_key == "DATA_ANALYST_TOOLS":
-                process_msg = f"{agent_name}正在分析数据…"
-            elif tools_key == "DESIGNER_TOOLS":
-                process_msg = f"{agent_name}正在设计中…"
-            else:
-                process_msg = f"{agent_name}前往数据仓库查询商品信息…"
+            process_msg = _get_process_message(agent_name, tools_key)
             yield {
                 "event": "process",
                 "data": {

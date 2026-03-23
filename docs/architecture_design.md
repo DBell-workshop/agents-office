@@ -981,7 +981,7 @@ gantt
 ### 5.4 文件结构变更
 
 ```
-电商ai/
+AgentOffice/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py              # 新增 DATABASE_URL 配置

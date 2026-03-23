@@ -14,8 +14,7 @@
 
 ---
 
-## 2. 产品定位与边界
-
+ 
 ### 2.1 AgentsOffice 是什么
 
 AgentsOffice 是一个 **AI Agent 管理与可视化平台**，它是承载所有 Agent 和非 Agent 模块的"容器"。类比：
@@ -726,7 +725,7 @@ GET    /api/v1/office/health                           系统健康检查
 ### 9.1 文件结构规划
 
 ```
-电商ai/
+AgentOffice/
 ├── app/
 │   ├── main.py                    # 现有业务路由 + 挂载 office 路由
 │   ├── models.py                  # 现有 Pydantic 模型

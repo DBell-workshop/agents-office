@@ -464,11 +464,216 @@ DESIGNER_TOOLS: List[Dict[str, Any]] = [
 ]
 
 
-def get_tools_by_key(tools_key: str) -> List[Dict[str, Any]]:
-    """根据 tools_key 字符串返回对应的工具列表。"""
-    _TOOLS_MAP = {
-        "DATA_ENGINEER_TOOLS": DATA_ENGINEER_TOOLS,
-        "DATA_ANALYST_TOOLS": DATA_ANALYST_TOOLS,
-        "DESIGNER_TOOLS": DESIGNER_TOOLS,
-    }
-    return _TOOLS_MAP.get(tools_key, PRODUCT_TOOLS)
+# ============================================================
+# 数据产品经理（大屏）专属工具
+# ============================================================
+DASHBOARD_TOOLS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_dashboard_templates",
+            "description": "列出所有可用的电商大屏模板（如 618、双十一、日常运营）。用户说想做大屏时，先调用此工具展示可选模板。",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_dashboard",
+            "description": "基于模板创建一个新的数据大屏。创建后返回大屏ID和访问链接。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "template_key": {
+                        "type": "string",
+                        "enum": ["618", "double11", "daily"],
+                        "description": "模板类型：618=年中大促，double11=双十一，daily=日常运营",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "自定义大屏名称（可选，不填则使用模板默认名称）",
+                    },
+                },
+                "required": ["template_key"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_dashboards",
+            "description": "列出用户已创建的所有数据大屏",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_dashboard_detail",
+            "description": "获取指定大屏的完整配置信息，包括图表列表和数据源",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dashboard_id": {
+                        "type": "string",
+                        "description": "大屏 ID",
+                    },
+                },
+                "required": ["dashboard_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_chart_to_dashboard",
+            "description": "向已有大屏添加一个自定义图表。支持 line/bar/pie/gauge/funnel/radar 类型。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dashboard_id": {
+                        "type": "string",
+                        "description": "目标大屏 ID",
+                    },
+                    "chart_type": {
+                        "type": "string",
+                        "enum": ["line", "bar", "pie", "gauge", "funnel", "radar"],
+                        "description": "图表类型",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "图表标题",
+                    },
+                    "sql": {
+                        "type": "string",
+                        "description": "数据查询 SQL",
+                    },
+                    "refresh_interval": {
+                        "type": "integer",
+                        "description": "刷新间隔（秒），默认300",
+                    },
+                },
+                "required": ["dashboard_id", "chart_type", "title", "sql"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "refresh_dashboard",
+            "description": "刷新大屏数据 — 执行各图表的查询获取最新数据",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dashboard_id": {
+                        "type": "string",
+                        "description": "要刷新的大屏 ID",
+                    },
+                },
+                "required": ["dashboard_id"],
+            },
+        },
+    },
+    # 数据产品经理也需要查询数据来设计指标
+    {
+        "type": "function",
+        "function": {
+            "name": "list_user_tables",
+            "description": "列出所有可用的数据表，了解有哪些数据可以用于大屏展示",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_sql",
+            "description": "执行 SQL 查询，用于验证数据是否可用、预览数据样例",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sql": {"type": "string", "description": "要执行的 SQL 语句"},
+                },
+                "required": ["sql"],
+            },
+        },
+    },
+]
+
+
+TOOLS_MAP: Dict[str, Dict[str, Any]] = {
+    "PRODUCT_TOOLS": {
+        "key": "PRODUCT_TOOLS",
+        "name": "商品搜索",
+        "description": "搜索和对比商品数据库",
+        "icon": "🛒",
+        "tools": PRODUCT_TOOLS,
+    },
+    "DATA_ENGINEER_TOOLS": {
+        "key": "DATA_ENGINEER_TOOLS",
+        "name": "数据工程",
+        "description": "连接数据源、建表、清洗数据、执行SQL",
+        "icon": "🔧",
+        "tools": DATA_ENGINEER_TOOLS,
+    },
+    "DATA_ANALYST_TOOLS": {
+        "key": "DATA_ANALYST_TOOLS",
+        "name": "数据分析",
+        "description": "成本查询、Agent统计、数据分析",
+        "icon": "📊",
+        "tools": DATA_ANALYST_TOOLS,
+    },
+    "DASHBOARD_TOOLS": {
+        "key": "DASHBOARD_TOOLS",
+        "name": "数据大屏",
+        "description": "创建和管理可视化数据大屏",
+        "icon": "📺",
+        "tools": DASHBOARD_TOOLS,
+    },
+    "DESIGNER_TOOLS": {
+        "key": "DESIGNER_TOOLS",
+        "name": "图片生成",
+        "description": "AI 生成营销图片和设计素材",
+        "icon": "🎨",
+        "tools": DESIGNER_TOOLS,
+    },
+}
+
+
+def get_skill_packs_catalog() -> List[Dict[str, Any]]:
+    """返回所有可用的技能包列表（不含工具 schema，仅摘要）。"""
+    return [
+        {"key": v["key"], "name": v["name"], "description": v["description"], "icon": v["icon"], "tool_count": len(v["tools"])}
+        for v in TOOLS_MAP.values()
+    ]
+
+
+def get_tools_by_key(tools_key) -> List[Dict[str, Any]]:
+    """根据 tools_key 返回工具列表。支持单个字符串或多个 key 的列表。"""
+    if isinstance(tools_key, list):
+        return get_tools_by_keys(tools_key)
+    entry = TOOLS_MAP.get(tools_key)
+    if entry:
+        return entry["tools"]
+    return TOOLS_MAP["PRODUCT_TOOLS"]["tools"]
+
+
+def get_tools_by_keys(keys: List[str]) -> List[Dict[str, Any]]:
+    """合并多个技能包的工具列表，自动去重（按 function.name）。"""
+    seen_names: set = set()
+    merged: List[Dict[str, Any]] = []
+    for key in keys:
+        entry = TOOLS_MAP.get(key)
+        if not entry:
+            continue
+        for tool in entry["tools"]:
+            name = tool.get("function", {}).get("name", "")
+            if name and name not in seen_names:
+                seen_names.add(name)
+                merged.append(tool)
+    return merged if merged else TOOLS_MAP["PRODUCT_TOOLS"]["tools"]

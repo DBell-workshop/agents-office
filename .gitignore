@@ -22,6 +22,9 @@ frontend/dist/
 .claude/
 .mcp.json
 
+# Pro 版文档（闭源，不随开源版发布）
+docs/pro/
+
 # Playwright MCP
 .playwright-mcp/
 
