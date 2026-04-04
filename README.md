@@ -6,97 +6,67 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/demo.gif" width="800" alt="AgentsOffice Demo" />
+  <img src="docs/images/demo.gif" width="800" alt="AgentFleet Demo" />
 </p>
 
-<h1 align="center">AgentsOffice</h1>
+<h1 align="center">AgentFleet</h1>
 
 <p align="center">
-  <strong>A visible office for your AI team</strong>
+  <strong>Give your AI team a visible office</strong><br/>
+  <sub>Pixel-art RPG workspace for multi-agent collaboration</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/DBell-workshop/agents-office/stargazers"><img src="https://img.shields.io/github/stars/DBell-workshop/agents-office?style=social" alt="Stars" /></a>
-  <a href="https://github.com/DBell-workshop/agents-office/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSL_1.1-blue" alt="License" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/python-3.11+-green" alt="Python" /></a>
+  <a href="https://github.com/DBell-workshop/AgentFleet/stargazers"><img src="https://img.shields.io/github/stars/DBell-workshop/AgentFleet?style=social" alt="Stars" /></a>
+  <a href="https://github.com/DBell-workshop/AgentFleet/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSL_1.1-blue" alt="License" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/python-3.9+-green" alt="Python" /></a>
   <a href="#"><img src="https://img.shields.io/badge/frontend-React%20%2B%20Phaser3-purple" alt="Frontend" /></a>
+  <a href="https://github.com/DBell-workshop/AgentFleet/releases/latest"><img src="https://img.shields.io/badge/download-macOS%20DMG-blue" alt="Download" /></a>
 </p>
 
 <p align="center">
-  <a href="#use-cases">Use Cases</a> ·
+  <a href="#screenshots">Screenshots</a> ·
   <a href="#features">Features</a> ·
   <a href="#quick-start">Quick Start</a> ·
+  <a href="#pro-vs-lite">Pro vs Lite</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="#support">Support Us</a> ·
-  <a href="LICENSE">License</a>
+  <a href="#support">Support Us</a>
 </p>
 
 ---
 
-## What is AgentsOffice?
+## What is AgentFleet?
 
-AgentsOffice is a **multi-agent collaboration workbench** that brings your AI team to life in a pixel-art RPG office.
+AgentFleet is a **multi-agent collaboration workbench** that brings your AI team to life in a pixel-art RPG office.
 
-Define roles, write prompts, equip skills -- spin up your own AI workforce in 5 minutes.
+Define roles, write prompts, pick scenes -- spin up your own AI workforce in minutes.
 
 > **Unlike other "pixel office" projects, our agents don't just wander around looking cute. They actually get work done.**
 
-| Other Projects | AgentsOffice |
+| Other Projects | AgentFleet |
 |---------|-------------|
-| Visual dashboards that display agent status | **Full-featured AI workbench** with real agent skills |
-| Requires external AI tools to function | **Built-in LLM chat + Skill engine**, works out of the box |
-| Single-role showcase | **Multi-role collaboration** with a dispatcher that auto-assigns tasks |
-| View-only | **Chat, trigger skills, and analyze data** |
+| Visual dashboards that display agent status | **Full-featured AI workbench** with real agent collaboration |
+| Requires external AI tools to function | **Built-in LLM chat + Delegation engine**, works out of the box |
+| Single-role showcase | **Multi-role teams** with a dispatcher that auto-assigns tasks |
+| View-only | **Chat, delegate tasks, and track progress** in real time |
 
 ---
 
-<a id="use-cases"></a>
-## Use Cases -- Define the roles, build your team
+<a id="screenshots"></a>
+## Screenshots
 
-> Here are some real-world scenarios you can set up in 5 minutes.
+> Screenshots are from **AgentFleet Pro**. The Lite (open-source) edition includes the core pixel office, agent chat, and scene system.
 
-### 📝 Content Creator Studio
-> Running a one-person media operation? Give yourself a content team.
-
-**Topic Planner** tracks trends and finds angles + **Content Editor** drafts and revises + **Headline Expert** generates 10 title options for you to pick from. Open the office each morning, drop your topic ideas into the group chat, and the three agents divide the work automatically -- you just make the final call.
-
-### 🎯 Product Design Team
-> Research, competitive analysis, PRD -- stop being the "human middleware."
-
-**User Researcher** organizes feedback and distills requirements + **Competitive Analyst** breaks down competitor features and strategies + **PRD Assistant** auto-generates requirement documents. Insights flow between agents automatically -- no more copy-pasting.
-
-### 📚 Education Tutoring Hub
-> Give students their own AI teaching team.
-
-**Knowledge Explainer** breaks down concepts in plain language + **Quiz Coach** generates practice problems matched to skill level + **Study Planner** adjusts review schedules based on mistakes. AI tutors in a pixel classroom -- learning with a sense of immersion.
-
-### 🎧 Customer Service Training Camp
-> Onboard new reps without tying up your senior staff.
-
-**Simulated Customer** role-plays as various buyer personas + **QA Supervisor** evaluates and scores each response in real time + **Script Coach** offers improvement tips after every round. A training-evaluation-improvement loop available 24/7.
-
-### 💡 Startup Advisory Board
-> Can't afford a consulting firm? Assemble an AI advisory team.
-
-**Market Analyst** researches industry trends + **Business Advisor** maps out monetization paths + **Growth Specialist** designs customer acquisition strategies. Drop your business plan into the group chat and get feedback from three advisors with different perspectives -- for less than the price of a dinner out each month.
-
-### 💻 Indie Developer Studio
-> Let AI teammates handle everything outside of coding.
-
-**Product Assistant** organizes requirements and writes user stories + **Code Reviewer** reviews code and finds bugs + **Marketing Copywriter** writes release notes and promotional copy. You focus on writing code; leave the rest to the team.
-
----
-
-| Scenario | Core Value | Agents |
-|------|---------|-----------|
-| Content Studio | One person, triple the output | 3 |
-| Product Design | Automated research-to-doc pipeline | 3 |
-| Education Tutoring | AI teaching team | 3 |
-| CS Training | Train-evaluate-improve loop | 3 |
-| Startup Advisory | Affordable consulting team | 3 |
-| Indie Dev | Full coverage beyond code | 3 |
-
-**Have your own scenario in mind?** Open AgentsOffice, create your agents, write your prompts, and get to work.
+<table>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/scene-selector.png" alt="Scene Selector" /><br/><sub>6 pre-built scene templates: E-commerce, Media Studio, Customer Service, Dev Team, Game Studio, Quantitative Trading</sub></td>
+<td width="50%"><img src="docs/images/screenshots/dashboard-dark.png" alt="Dark Dashboard" /><br/><sub>Real-time operations dashboard with token usage, cost tracking, and agent activity</sub></td>
+</tr>
+<tr>
+<td><img src="docs/images/screenshots/dashboard-light.png" alt="Light Dashboard" /><br/><sub>Light theme dashboard with delegation funnel and model usage breakdown</sub></td>
+<td><img src="docs/images/screenshots/onboarding-scenes.png" alt="Onboarding" /><br/><sub>Guided onboarding: choose your scene and start working immediately</sub></td>
+</tr>
+</table>
 
 ---
 
@@ -104,69 +74,107 @@ Define roles, write prompts, equip skills -- spin up your own AI workforce in 5 
 ## Features
 
 ### 🏢 Pixel-Art RPG Office
-Built on the Phaser 3 game engine -- a 2D pixel office where every agent has their own desk, room, and animations. Click an agent to start a conversation.
+Built on Phaser 3 -- a 2D pixel office where every agent has their own desk, room, and animations. Watch them walk, type, and celebrate as they work on your tasks.
+
+### 🎭 Scene System
+Switch between pre-built scene templates to reconfigure your entire team:
+- **Media Studio** -- Copywriter, Video Editor, Operations, Designer
+- **E-commerce Center** -- Data Engineer, Data PM, Operations
+- **Customer Service** -- Reception, Complaints, Follow-up
+- **Dev Team, Game Studio, Quant Trading** and more
+
+Each scene has its own agents, chat history, and delegation records -- fully isolated.
 
 ### 🤖 Flexible Agent System
-- **Unlimited agents**: Create as many agents as you need to build your dream team
-- **Configurable via UI**: Name, prompt, model, skills -- no code changes needed
-- **20 pre-made pixel characters** to choose from, giving each agent a unique look
+- **Unlimited agents**: Build your dream team with any roles you need
+- **Per-agent model config**: Choose different LLMs for each agent (Gemini, Claude, GPT, DeepSeek, Qwen)
+- **20 pixel characters** to give each agent a unique look
+- **Desktop pet cat** that reacts to agent activity (12 breeds!)
 
 ### 💬 Smart Conversations
 - **Group chat**: The dispatcher auto-detects intent and routes to the right agent
 - **Direct messages**: One-on-one deep conversations with a specific agent
-- **Auto-triggered skills**: Agents automatically execute skills when the context calls for it
+- **Roundtable discussions**: Multiple agents collaborate on complex topics
 
-### 🔌 Skill Plugin System
-- Extend `BaseSkill` to build custom skills
-- Skills support multi-step interactions (search -> select -> analyze)
-- SSE real-time progress streaming
+### 📋 Delegation System (Pro)
+Say what you need in one sentence -- the AI team auto-plans and executes:
+1. You say: "Help me write a social media strategy"
+2. Project Manager creates a 6-step execution plan
+3. Team executes each step automatically
+4. You see real-time progress with step-by-step updates
 
-### 🗄️ Data Management
-- The Data Engineer agent helps you upload CSVs, create tables, and query data
-- PostgreSQL persistence with flexible JSONB fields
-- Connect to external databases
+### 📊 Operations Dashboard (Pro)
+Real-time monitoring: token usage, cost tracking, agent activity, delegation funnel.
 
-### 🧮 Cost Tracking
-- Every LLM call is logged with token usage and cost
-- View cost reports by agent or by model
-- Built-in pricing for popular models (OpenAI, Claude, Gemini, DeepSeek)
+### 🐱 Desktop Pet
+A pixel cat companion that lives in its own window:
+- **Idle** -- breathing animation when nothing's happening
+- **Typing** -- bongo cat animation when agents are working
+- **Celebrating** -- sparkle effects when tasks complete
+- **12 cat breeds** -- double-click to cycle through them
 
 ---
 
 <a id="quick-start"></a>
 ## Quick Start
 
-### One-Click Launch (Recommended)
+### Desktop App (Recommended)
 
-Just install [Docker](https://www.docker.com/products/docker-desktop/), then:
+Download the latest DMG from [Releases](https://github.com/DBell-workshop/AgentFleet/releases/latest):
 
-```bash
-git clone https://github.com/DBell-workshop/agents-office.git
-cd agents-office
-cp .env.example .env   # Edit .env, add at least one LLM API Key
-docker compose up -d
-```
+1. Download `AgentFleet_x.x.x_aarch64.dmg` (macOS Apple Silicon)
+2. Drag to Applications
+3. Launch -- the pixel loading screen appears while the backend starts
+4. Configure your API key in Settings and start chatting
 
-Open **http://localhost:8001/static/office/** and you're good to go.
+> The DMG is signed and notarized by Apple -- no security warnings.
 
 ### Development Mode
 
-If you want to modify code (with hot reload):
-
 ```bash
-# Database
-docker compose up postgres -d
+git clone https://github.com/DBell-workshop/AgentFleet.git
+cd AgentFleet
 
 # Backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8001
+python run_server.py
 
 # Frontend (separate terminal)
 cd frontend && npm install && npm run dev
 ```
 
-Dev mode: visit **http://localhost:5174/static/office/**
+Visit **http://localhost:8000/static/office/**
+
+### Docker
+
+```bash
+cp .env.example .env   # Add at least one LLM API Key
+docker compose up -d
+```
+
+---
+
+<a id="pro-vs-lite"></a>
+## Pro vs Lite
+
+| Feature | Lite (Open Source) | Pro |
+|---------|:------------------:|:---:|
+| Pixel-art RPG office | ✅ | ✅ |
+| Agent chat (group + DM) | ✅ | ✅ |
+| Scene templates | ✅ | ✅ |
+| Agent config panel | ✅ | ✅ |
+| Roundtable discussions | ✅ | ✅ |
+| Desktop pet cat | ✅ | ✅ |
+| Delegation system | - | ✅ |
+| Operations dashboard | - | ✅ |
+| CLI integration (Claude/Codex) | - | ✅ |
+| Desktop app (Tauri) | - | ✅ |
+| E-commerce report pack | - | ✅ |
+
+> This repository contains the **Lite** edition. Pro features shown in screenshots are for demonstration purposes.
+>
+> Interested in Pro? Visit [linkos.cc](https://linkos.cc) or join our community.
 
 ---
 
@@ -174,88 +182,74 @@ Dev mode: visit **http://localhost:5174/static/office/**
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                  Frontend                    │
-│  Phaser RPG Engine + React Overlay + ChatBox │
-│  (Pixel Office + Agent Panel + Chat Dialog)  │
-└────────────────────┬────────────────────────┘
+┌──────────────────────────────────────────────┐
+│                  Frontend                     │
+│  Phaser 3 RPG Engine + React Overlay + Chat   │
+│  (Pixel Office + Agent Panel + Chat Dialog)   │
+└────────────────────┬─────────────────────────┘
                      │ SSE / REST
-┌────────────────────▼────────────────────────┐
-│              FastAPI Backend                  │
-│                                              │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
-│  │ AgentChat │  │  Skills  │  │  Data     │  │
-│  │ (Dispatch │  │  Engine  │  │  Manager  │  │
-│  │  & DM)   │  │          │  │           │  │
-│  └─────┬────┘  └─────┬────┘  └─────┬─────┘  │
-│        │             │             │         │
-│  ┌─────▼─────────────▼─────────────▼──────┐  │
-│  │           Service Layer                 │  │
-│  │  LLM Service / Agent Runner             │  │
-│  │  Skill Engine / Cost Tracker            │  │
-│  └─────────────────┬──────────────────────┘  │
-│                    │                         │
-│  ┌─────────────────▼──────────────────────┐  │
-│  │         PostgreSQL + SQLAlchemy         │  │
-│  │    Agents / Skills / Tasks / Costs      │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
+┌────────────────────▼─────────────────────────┐
+│              FastAPI Backend                   │
+│                                               │
+│  ┌───────────┐  ┌──────────┐  ┌────────────┐ │
+│  │ Agent Chat │  │  Scene   │  │   Data     │ │
+│  │ (Dispatch  │  │  System  │  │  Manager   │ │
+│  │  + DM)     │  │          │  │            │ │
+│  └─────┬──────┘  └─────┬────┘  └─────┬──────┘ │
+│        │               │             │        │
+│  ┌─────▼───────────────▼─────────────▼─────┐  │
+│  │           Service Layer                  │  │
+│  │  LLM (LiteLLM) / Agent Runner           │  │
+│  │  Scene Manager / Cost Tracker            │  │
+│  └──────────────────┬──────────────────────┘  │
+│                     │                         │
+│  ┌──────────────────▼──────────────────────┐  │
+│  │         SQLite / PostgreSQL              │  │
+│  │    Agents / Scenes / Chats / Costs       │  │
+│  └─────────────────────────────────────────┘  │
+└───────────────────────────────────────────────┘
 ```
 
 **Tech Stack:**
-- **Backend**: Python, FastAPI, SQLAlchemy, Pydantic
-- **Frontend**: TypeScript, React, Phaser 3 (RPG engine)
-- **AI**: LLM via OpenAI-compatible API (GPT, Claude, Gemini, Qwen, DeepSeek)
-- **Database**: PostgreSQL with JSONB
-- **Infra**: Docker Compose
+- **Backend**: Python, FastAPI, SQLAlchemy, LiteLLM
+- **Frontend**: TypeScript, React, Phaser 3
+- **AI**: Gemini, Claude, GPT, DeepSeek, Qwen (via LiteLLM)
+- **Database**: SQLite (desktop) / PostgreSQL (server)
+- **Desktop**: Tauri (Pro)
+
+---
+
+## Roadmap
+
+- [x] Pixel-art RPG office with agent animations
+- [x] Scene system with isolated agents and chat history
+- [x] Group chat dispatch & direct messages & roundtable
+- [x] Per-agent model configuration
+- [x] Desktop pet cat (12 breeds, activity-reactive)
+- [x] LLM cost tracking
+- [x] Delegation system (Pro)
+- [x] Operations dashboard (Pro)
+- [x] macOS desktop app with Tauri (Pro)
+- [ ] Windows / Linux desktop app
+- [ ] Mobile-responsive layout
+- [ ] Skill marketplace (community sharing)
+- [ ] More scene templates
 
 ---
 
 <a id="support"></a>
 ## Support This Project
 
-AgentsOffice is a community-driven open source project. If you find it useful, please consider supporting us:
+AgentFleet is an open-source project. If you find it useful:
 
-<p align="center">
-
-**⭐ [Star this repo](https://github.com/DBell-workshop/agents-office)** — The simplest way to support us
-
-**💳 PayPal** — Scan to support us<br/>
-<img src="docs/paypal-qr.png" width="180" alt="PayPal QR" />
-
-</p>
-
-> Every Star and sponsorship keeps us going!
-
----
-
-## Roadmap
-
-- [x] Pixel-art RPG office UI
-- [x] Dynamic agent configuration (UI panel)
-- [x] Group chat dispatch & direct messages
-- [x] Skill plugin engine
-- [x] Data Engineer (file upload, table creation, SQL queries)
-- [x] LLM cost tracking
-- [ ] More pre-built skill templates
-- [ ] Agent state animations (working -> typing on keyboard, idle -> sipping coffee)
-- [ ] Mobile-responsive layout
-- [ ] Token top-up & usage management
-- [ ] Skill marketplace (community sharing)
+**⭐ [Star this repo](https://github.com/DBell-workshop/AgentFleet)** -- The simplest way to support us
 
 ---
 
 ## Community
 
-Join the community to share ideas, ask questions, and show off your agent setups:
-
 <p align="center">
   <a href="https://discord.gg/3Cpe5H6m"><img src="https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
-</p>
-
-<p align="center">
-  <strong>WeChat Group</strong> (scan to join; after 7-day expiry, get the latest QR in Discussions)<br/>
-  <img src="docs/wechat-qr.jpg" width="200" alt="WeChat Group QR" />
 </p>
 
 ---
@@ -264,10 +258,9 @@ Join the community to share ideas, ask questions, and show off your agent setups
 
 Contributions are welcome!
 
-- Open an Issue to report bugs or suggest features
+- Open an [Issue](https://github.com/DBell-workshop/AgentFleet/issues) to report bugs or suggest features
 - Submit a PR to contribute code
-- Build custom skills and share them with the community
-- Chat with us on [Discussions](https://github.com/DBell-workshop/agents-office/discussions)
+- Chat with us on [Discussions](https://github.com/DBell-workshop/AgentFleet/discussions)
 
 ---
 
@@ -284,5 +277,5 @@ See the [LICENSE](LICENSE) file for details.
 ---
 
 <p align="center">
-  <sub>Built with ❤️ by the AgentsOffice Team</sub>
+  <sub>Built with ❤️ by the AgentFleet Team</sub>
 </p>
